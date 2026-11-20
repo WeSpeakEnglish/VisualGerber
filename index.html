@@ -1,0 +1,1142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gerber 3D Viewer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<style>
+:root{
+  --bg:#e8e9ed; --panel:#ffffff; --ink:#1d2129; --muted:#6b7280; --line:#e2e4e9;
+  --accent:#1f6f43; --accent-ink:#fff; --chip:#f3f4f6; --warn:#b45309; --err:#b91c1c;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+  font:13px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#app{display:flex;height:100%}
+aside{width:320px;flex:none;background:var(--panel);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;overflow:hidden}
+aside header{padding:16px 16px 12px;border-bottom:1px solid var(--line)}
+aside h1{font-size:15px;margin:0 0 2px;font-weight:650;letter-spacing:.2px}
+aside header p{margin:0;color:var(--muted);font-size:12px}
+.scroll{overflow:auto;flex:1;padding:12px 16px 20px}
+.sec{margin:14px 0 6px;font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+button,.btn{appearance:none;border:1px solid var(--line);background:var(--chip);color:var(--ink);
+  border-radius:7px;padding:7px 11px;font:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+button:hover,.btn:hover{border-color:#c9ccd3}
+.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.primary:hover{filter:brightness(1.08);border-color:var(--accent)}
+#files{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.file{border:1px solid var(--line);border-radius:8px;padding:7px 8px;display:grid;
+  grid-template-columns:1fr auto;gap:4px 8px;align-items:center}
+.file .nm{font-size:12px;font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file .st{grid-column:1/3;font-size:11px;color:var(--muted)}
+.file .st.err{color:var(--err)}
+.file select{font:inherit;font-size:12px;padding:3px 4px;border-radius:6px;border:1px solid var(--line);background:#fff}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.15)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:7px 0}
+.row label{color:var(--ink)}
+.row select{font:inherit;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:#fff}
+.swatches{display:flex;gap:6px}
+.sw{width:22px;height:22px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);cursor:pointer;padding:0}
+.sw[aria-pressed=true]{box-shadow:0 0 0 2px var(--ink)}
+.toggle{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.toggle input{accent-color:var(--accent);width:15px;height:15px}
+.info{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12px}
+.info dt{color:var(--muted)} .info dd{margin:0;font-variant-numeric:tabular-nums}
+main{flex:1;position:relative;min-width:0}
+#view{position:absolute;inset:0}
+#view canvas{display:block;width:100%;height:100%;outline:none}
+.toolbar{position:absolute;top:12px;right:12px;display:flex;gap:6px;background:rgba(255,255,255,.85);
+  backdrop-filter:blur(6px);padding:5px;border-radius:10px;border:1px solid var(--line)}
+.toolbar button{background:transparent;border-color:transparent;padding:6px 9px}
+.toolbar button:hover{background:var(--chip)}
+.hint{position:absolute;left:12px;bottom:10px;color:var(--muted);font-size:11px;
+  background:rgba(255,255,255,.7);padding:4px 8px;border-radius:6px}
+#empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+#empty .card{pointer-events:auto;text-align:center;background:var(--panel);border:1.5px dashed #c3c7cf;
+  border-radius:14px;padding:28px 34px;max-width:420px}
+#empty h2{margin:0 0 6px;font-size:17px}
+#empty p{margin:0 0 16px;color:var(--muted)}
+#drop{position:fixed;inset:0;background:rgba(31,111,67,.12);border:3px dashed var(--accent);
+  display:none;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:var(--accent);z-index:10}
+#drop.on{display:flex}
+#busy{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:var(--ink);color:#fff;
+  padding:6px 12px;border-radius:20px;font-size:12px;display:none}
+#busy.on{display:block}
+.menu-btn{display:none}
+@media (max-width:760px){
+  #app{flex-direction:column-reverse}
+  aside{width:100%;height:42vh;border-right:0;border-top:1px solid var(--line)}
+  main{flex:1}
+  .toolbar{left:12px;right:auto;flex-wrap:wrap}
+  .hint{display:none}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside>
+    <header>
+      <h1>Gerber 3D Viewer</h1>
+      <p>Drop Gerber + Excellon drill files or a .zip. Everything runs locally in your browser.</p>
+    </header>
+    <div class="scroll">
+      <div class="btns">
+        <label class="btn primary" for="fileInput">Open files…</label>
+        <input id="fileInput" type="file" multiple hidden>
+        <button id="clearBtn">Clear</button>
+      </div>
+
+      <div class="sec">Layers</div>
+      <div id="files"><div style="color:var(--muted);font-size:12px">No files loaded.</div></div>
+
+      <div class="sec">Appearance</div>
+      <div class="row"><label>Solder mask</label>
+        <div class="swatches" id="maskSw"></div></div>
+      <div class="row"><label>Surface finish</label>
+        <select id="finish"><option value="enig">ENIG (gold)</option><option value="hasl">HASL (silver)</option><option value="copper">Bare copper</option></select></div>
+      <div class="row"><label>Silkscreen</label>
+        <select id="silkColor"><option value="#f4f4f2">White</option><option value="#1b1b1b">Black</option><option value="#f1d23a">Yellow</option></select></div>
+      <div class="row"><label>Thickness</label>
+        <select id="thick"><option>0.6</option><option>0.8</option><option>1.0</option><option>1.2</option><option selected>1.6</option><option>2.0</option><option>2.4</option></select></div>
+      <div class="row" style="flex-wrap:wrap;justify-content:flex-start;gap:14px">
+        <label class="toggle"><input type="checkbox" id="tMask" checked>Mask</label>
+        <label class="toggle"><input type="checkbox" id="tSilk" checked>Silk</label>
+        <label class="toggle"><input type="checkbox" id="tCu" checked>Copper</label>
+        <label class="toggle"><input type="checkbox" id="tHoles" checked>Holes</label>
+      </div>
+
+      <div class="sec">Board</div>
+      <dl class="info" id="info"><dt>Size</dt><dd>—</dd></dl>
+    </div>
+  </aside>
+  <main>
+    <div id="view"></div>
+    <div id="empty"><div class="card">
+      <h2>Open a Gerber set</h2>
+      <p>KiCad, Altium, EAGLE and most other CAD exports work: copper, mask, silk, outline and drill files, loose or zipped.</p>
+      <div class="btns" style="justify-content:center">
+        <label class="btn primary" for="fileInput">Open files…</label>
+      </div>
+    </div></div>
+    <div class="toolbar">
+      <button data-view="iso" title="Isometric">Iso</button>
+      <button data-view="top" title="Top view">Top</button>
+      <button data-view="bottom" title="Bottom view">Bottom</button>
+      <button data-view="flip" title="Flip board">Flip</button>
+      <button id="pngBtn" title="Save image">PNG</button>
+    </div>
+    <div id="busy">Rendering…</div>
+    <div class="hint">Drag to orbit · right-drag to pan · scroll to zoom</div>
+  </main>
+</div>
+<div id="drop">Drop Gerber files or .zip</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* =====================================================================
+   Gerber (RS-274X) parser → display list in millimetres
+   ===================================================================== */
+const TAU = Math.PI * 2;
+
+function evalExpr(e, vars) {
+  let s = String(e).replace(/\s+/g, '').replace(/\$(\d+)/g, (m, k) => '(' + (vars[k] ?? 0) + ')').replace(/[xX]/g, '*');
+  if (!/^[\d.+\-*/()]*$/.test(s) || s === '') return 0;
+  try { const v = Function('"use strict";return (' + s + ')')(); return Number.isFinite(v) ? v : 0; } catch { return 0; }
+}
+
+function parseMacro(stmts) {
+  const out = [];
+  for (let st of stmts) {
+    st = st.trim(); if (!st) continue;
+    if (/^0(\s|$)/.test(st)) continue;               // comment
+    const va = st.match(/^\$(\d+)=(.+)$/);
+    if (va) { out.push({ var: +va[1], expr: va[2] }); continue; }
+    const parts = st.split(',');
+    out.push({ code: parseInt(parts[0], 10), args: parts.slice(1) });
+  }
+  return out;
+}
+
+function rot2(x, y, deg) {
+  if (!deg) return [x, y];
+  const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+  return [x * c - y * s, x * s + y * c];
+}
+
+// Instantiate an aperture macro into primitives (macro units, origin at flash point)
+function instMacro(body, params) {
+  const v = {}; params.forEach((p, i) => v[i + 1] = p);
+  const prims = [];
+  for (const st of body) {
+    if (st.var) { v[st.var] = evalExpr(st.expr, v); continue; }
+    const a = st.args.map(x => evalExpr(x, v));
+    switch (st.code) {
+      case 1: { const [exp, d, cx, cy, rot = 0] = a; const [x, y] = rot2(cx, cy, rot); prims.push({ exp, k: 'c', x, y, r: d / 2 }); break; }
+      case 2: case 20: { const [exp, w, x1, y1, x2, y2, rot = 0] = a;
+        const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1, nx = -dy / L * w / 2, ny = dx / L * w / 2;
+        const pts = [[x1 + nx, y1 + ny], [x2 + nx, y2 + ny], [x2 - nx, y2 - ny], [x1 - nx, y1 - ny]].map(p => rot2(p[0], p[1], rot));
+        prims.push({ exp, k: 'p', pts }); break; }
+      case 21: { const [exp, w, h, cx, cy, rot = 0] = a;
+        const pts = [[cx - w / 2, cy - h / 2], [cx + w / 2, cy - h / 2], [cx + w / 2, cy + h / 2], [cx - w / 2, cy + h / 2]].map(p => rot2(p[0], p[1], rot));
+        prims.push({ exp, k: 'p', pts }); break; }
+      case 22: { const [exp, w, h, x, y, rot = 0] = a;
+        const pts = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]].map(p => rot2(p[0], p[1], rot));
+        prims.push({ exp, k: 'p', pts }); break; }
+      case 4: { const exp = a[0], n = a[1] | 0, pts = [];
+        for (let i = 0; i <= n; i++) pts.push([a[2 + i * 2], a[3 + i * 2]]);
+        const rot = a[2 + (n + 1) * 2] || 0;
+        prims.push({ exp, k: 'p', pts: pts.map(p => rot2(p[0], p[1], rot)) }); break; }
+      case 5: { const [exp, n, cx, cy, d, rot = 0] = a, pts = [];
+        for (let i = 0; i < n; i++) { const t = i / n * TAU; pts.push(rot2(cx + Math.cos(t) * d / 2, cy + Math.sin(t) * d / 2, rot)); }
+        prims.push({ exp, k: 'p', pts }); break; }
+      case 6: { const [cx, cy, od, th, gap, n, cw, cl, rot = 0] = a; const [x, y] = rot2(cx, cy, rot);
+        let d = od; for (let i = 0; i < n && d > 0; i++) { prims.push({ exp: 1, k: 'c', x, y, r: d / 2 }); prims.push({ exp: 0, k: 'c', x, y, r: d / 2 - th }); d -= 2 * (th + gap); }
+        for (const ang of [0, 90]) { const pts = [[-cl / 2, -cw / 2], [cl / 2, -cw / 2], [cl / 2, cw / 2], [-cl / 2, cw / 2]].map(p => { const q = rot2(p[0], p[1], ang); return rot2(q[0] + cx, q[1] + cy, rot); }); prims.push({ exp: 1, k: 'p', pts }); }
+        break; }
+      case 7: { const [cx, cy, od, id, gap, rot = 0] = a; prims.push({ exp: 1, k: 't', cx, cy, od, id, gap, rot }); break; }
+      default: break;
+    }
+  }
+  let bb = [Infinity, Infinity, -Infinity, -Infinity];
+  const add = (x, y) => { bb[0] = Math.min(bb[0], x); bb[1] = Math.min(bb[1], y); bb[2] = Math.max(bb[2], x); bb[3] = Math.max(bb[3], y); };
+  for (const p of prims) {
+    if (p.k === 'c') { add(p.x - p.r, p.y - p.r); add(p.x + p.r, p.y + p.r); }
+    else if (p.k === 'p') p.pts.forEach(q => add(q[0], q[1]));
+    else { const [x, y] = rot2(p.cx, p.cy, p.rot); add(x - p.od / 2, y - p.od / 2); add(x + p.od / 2, y + p.od / 2); }
+  }
+  if (!isFinite(bb[0])) bb = [0, 0, 0, 0];
+  const simple = prims.every(p => p.exp !== 0 && p.k !== 't');
+  return { prims, bb, simple };
+}
+
+function parseGerber(text) {
+  const st = {
+    xi: 3, xd: 6, yi: 3, yd: 6, zero: 'L', unit: 1, aps: {}, macros: {}, cur: null,
+    x: 0, y: 0, interp: 1, quad: 'multi', region: false, contours: null, contour: null,
+    dark: true, ops: [], sr: null, attrs: {}, lastD: 1, warn: new Set()
+  };
+  const ops = st.ops;
+
+  const num = (s, axis) => {
+    if (s.includes('.')) return parseFloat(s) * st.unit;
+    let neg = false; if (s[0] === '-' || s[0] === '+') { neg = s[0] === '-'; s = s.slice(1); }
+    const ii = axis === 'y' ? st.yi : st.xi, dd = axis === 'y' ? st.yd : st.xd;
+    if (st.zero === 'T') s = s.padEnd(ii + dd, '0');
+    const v = parseInt(s, 10) / Math.pow(10, dd);
+    return (neg ? -v : v) * st.unit;
+  };
+
+  function endSR() {
+    const sr = st.sr; st.sr = null;
+    if (!sr || (sr.nx <= 1 && sr.ny <= 1)) return;
+    const block = ops.slice(sr.start);
+    for (let ix = 0; ix < sr.nx; ix++) for (let iy = 0; iy < sr.ny; iy++) {
+      if (!ix && !iy) continue;
+      for (const op of block) ops.push(shiftOp(op, ix * sr.i, iy * sr.j));
+    }
+  }
+
+  function ext(block) {
+    const stmts = block.split('*').map(s => s.replace(/[\r\n]/g, '').trim()).filter(Boolean);
+    if (!stmts.length) return;
+    if (stmts[0].startsWith('AM')) { st.macros[stmts[0].slice(2)] = parseMacro(stmts.slice(1)); return; }
+    for (const s of stmts) {
+      const c = s.slice(0, 2);
+      if (c === 'FS') {
+        const m = s.match(/FS([LT])?([AI])?.*?X(\d)(\d)Y(\d)(\d)/);
+        if (m) { st.zero = m[1] || 'L'; st.xi = +m[3]; st.xd = +m[4]; st.yi = +m[5]; st.yd = +m[6]; }
+      } else if (c === 'MO') st.unit = s.includes('IN') ? 25.4 : 1;
+      else if (c === 'AD') {
+        const m = s.match(/^ADD(\d+)([^,]+)(?:,(.*))?$/);
+        if (!m) continue;
+        const code = +m[1], tpl = m[2], p = m[3] ? m[3].split('X').map(Number) : [], u = st.unit;
+        let ap;
+        if (tpl === 'C') ap = { t: 'C', d: p[0] * u, hd: (p[1] || 0) * u };
+        else if (tpl === 'R') ap = { t: 'R', w: p[0] * u, h: p[1] * u, hd: (p[2] || 0) * u };
+        else if (tpl === 'O') ap = { t: 'O', w: p[0] * u, h: p[1] * u, hd: (p[2] || 0) * u };
+        else if (tpl === 'P') ap = { t: 'P', d: p[0] * u, n: p[1] | 0, rot: p[2] || 0, hd: (p[3] || 0) * u };
+        else if (st.macros[tpl]) { const mi = instMacro(st.macros[tpl], p); ap = { t: 'M', u, ...mi }; }
+        else { st.warn.add('Unknown aperture ' + tpl); ap = { t: 'C', d: 0.1, hd: 0 }; }
+        st.aps[code] = ap;
+      } else if (c === 'LP') st.dark = s[2] !== 'C';
+      else if (c === 'SR') {
+        endSR();
+        const g = k => { const m = s.match(new RegExp(k + '([-\\d.]+)')); return m ? parseFloat(m[1]) : null; };
+        const nx = g('X'), ny = g('Y');
+        if (nx != null || ny != null) st.sr = { nx: nx || 1, ny: ny || 1, i: (g('I') || 0) * st.unit, j: (g('J') || 0) * st.unit, start: ops.length };
+      } else if (c === 'TF') {
+        const m = s.match(/^TF\.?([^,]+),(.*)$/); if (m) st.attrs[m[1]] = m[2];
+      } else if (c === 'AB') st.warn.add('Block apertures not supported');
+    }
+  }
+
+  function arcGeom(x1, y1, x2, y2, i, j, ccw) {
+    if (st.quad === 'multi') {
+      const cx = x1 + i, cy = y1 + j, r = Math.hypot(i, j);
+      let a0 = Math.atan2(y1 - cy, x1 - cx), a1 = Math.atan2(y2 - cy, x2 - cx);
+      if (ccw) { while (a1 <= a0 + 1e-9) a1 += TAU; } else { while (a1 >= a0 - 1e-9) a1 -= TAU; }
+      return { cx, cy, r, a0, a1 };
+    }
+    let best = null;
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+      const cx = x1 + sx * Math.abs(i), cy = y1 + sy * Math.abs(j);
+      const r1 = Math.hypot(x1 - cx, y1 - cy), r2 = Math.hypot(x2 - cx, y2 - cy);
+      let a0 = Math.atan2(y1 - cy, x1 - cx), a1 = Math.atan2(y2 - cy, x2 - cx);
+      if (ccw) { while (a1 < a0) a1 += TAU; } else { while (a1 > a0) a1 -= TAU; }
+      if (Math.abs(a1 - a0) > Math.PI / 2 + 1e-3) continue;
+      const err = Math.abs(r1 - r2);
+      if (!best || err < best.err) best = { cx, cy, r: r1, a0, a1, err };
+    }
+    return best || { cx: x1, cy: y1, r: 0, a0: 0, a1: 0 };
+  }
+
+  function word(w) {
+    if (!w) return;
+    if (/^G0?4/.test(w)) return;
+    if (/^M0?[02]/.test(w)) return;
+    const toks = w.match(/[A-Z][+-]?[\d.]*/g) || [];
+    let X = null, Y = null, I = 0, J = 0, D = null;
+    for (const t of toks) {
+      const L = t[0], v = t.slice(1);
+      if (L === 'G') {
+        const g = parseInt(v, 10);
+        if (g === 1) st.interp = 1; else if (g === 2) st.interp = 2; else if (g === 3) st.interp = 3;
+        else if (g === 36) { st.region = true; st.contours = []; st.contour = null; }
+        else if (g === 37) {
+          if (st.contour && st.contour.length > 1) st.contours.push(st.contour);
+          if (st.contours.length) ops.push({ t: 'region', contours: st.contours, dark: st.dark });
+          st.region = false; st.contours = null; st.contour = null;
+        }
+        else if (g === 74) st.quad = 'single'; else if (g === 75) st.quad = 'multi';
+        else if (g === 70) st.unit = 25.4; else if (g === 71) st.unit = 1;
+      } else if (L === 'X') X = num(v, 'x');
+      else if (L === 'Y') Y = num(v, 'y');
+      else if (L === 'I') I = num(v, 'x');
+      else if (L === 'J') J = num(v, 'y');
+      else if (L === 'D') D = parseInt(v, 10);
+    }
+    if (D != null && D >= 10) { st.cur = D; return; }
+    const hasXY = X != null || Y != null;
+    if (D == null) { if (!hasXY) return; D = st.lastD; }
+    st.lastD = D;
+    const nx = X ?? st.x, ny = Y ?? st.y;
+    const ap = st.aps[st.cur];
+    if (D === 1) {
+      if (st.region) {
+        if (!st.contour) st.contour = [{ t: 'M', x: st.x, y: st.y }];
+        if (st.interp === 1) st.contour.push({ t: 'L', x: nx, y: ny });
+        else { const a = arcGeom(st.x, st.y, nx, ny, I, J, st.interp === 3); st.contour.push({ t: 'A', x: nx, y: ny, ...a }); }
+      } else if (ap) {
+        if (st.interp === 1) ops.push({ t: 'line', ap, x1: st.x, y1: st.y, x2: nx, y2: ny, dark: st.dark });
+        else { const a = arcGeom(st.x, st.y, nx, ny, I, J, st.interp === 3); ops.push({ t: 'arc', ap, x1: st.x, y1: st.y, x2: nx, y2: ny, ...a, dark: st.dark }); }
+      }
+    } else if (D === 2) {
+      if (st.region && st.contour) { if (st.contour.length > 1) st.contours.push(st.contour); st.contour = null; }
+    } else if (D === 3) {
+      if (ap) ops.push({ t: 'flash', ap, x: nx, y: ny, dark: st.dark });
+    }
+    st.x = nx; st.y = ny;
+  }
+
+  let i = 0; const n = text.length;
+  while (i < n) {
+    const c = text[i];
+    if (c === '%') { const j = text.indexOf('%', i + 1); if (j < 0) break; ext(text.slice(i + 1, j)); i = j + 1; }
+    else if (c <= ' ') i++;
+    else { const j = text.indexOf('*', i); if (j < 0) break; word(text.slice(i, j).replace(/\s+/g, '')); i = j + 1; }
+  }
+  endSR();
+  if (st.region && st.contours) { if (st.contour && st.contour.length > 1) st.contours.push(st.contour); ops.push({ t: 'region', contours: st.contours, dark: st.dark }); }
+  return { ops, attrs: st.attrs, warnings: [...st.warn] };
+}
+
+function shiftOp(op, dx, dy) {
+  const o = { ...op };
+  if (o.t === 'flash') { o.x += dx; o.y += dy; }
+  else if (o.t === 'line' || o.t === 'arc') { o.x1 += dx; o.y1 += dy; o.x2 += dx; o.y2 += dy; if (o.t === 'arc') { o.cx += dx; o.cy += dy; } }
+  else if (o.t === 'region') o.contours = o.contours.map(c => c.map(s => { const q = { ...s, x: s.x + dx, y: s.y + dy }; if (s.t === 'A') { q.cx += dx; q.cy += dy; } return q; }));
+  return o;
+}
+
+function apSize(ap) {
+  if (!ap) return 0;
+  if (ap.t === 'C' || ap.t === 'P') return ap.d;
+  if (ap.t === 'R' || ap.t === 'O') return Math.max(ap.w, ap.h);
+  if (ap.t === 'M') return Math.max(ap.bb[2] - ap.bb[0], ap.bb[3] - ap.bb[1]) * ap.u;
+  return 0;
+}
+
+function opsBounds(ops) {
+  const b = [Infinity, Infinity, -Infinity, -Infinity];
+  const add = (x, y, r = 0) => { b[0] = Math.min(b[0], x - r); b[1] = Math.min(b[1], y - r); b[2] = Math.max(b[2], x + r); b[3] = Math.max(b[3], y + r); };
+  for (const o of ops) {
+    if (o.t === 'flash') add(o.x, o.y, apSize(o.ap) / 2);
+    else if (o.t === 'line') { const r = apSize(o.ap) / 2; add(o.x1, o.y1, r); add(o.x2, o.y2, r); }
+    else if (o.t === 'arc') { const pts = arcPoints(o.cx, o.cy, o.r, o.a0, o.a1); const r = apSize(o.ap) / 2; pts.forEach(p => add(p[0], p[1], r)); }
+    else if (o.t === 'region') o.contours.forEach(c => c.forEach(s => { if (s.t === 'A') arcPoints(s.cx, s.cy, s.r, s.a0, s.a1).forEach(p => add(p[0], p[1])); else add(s.x, s.y); }));
+  }
+  return b;
+}
+
+function arcPoints(cx, cy, r, a0, a1, segLen = 0.15) {
+  const sweep = a1 - a0;
+  const n = Math.max(2, Math.min(720, Math.ceil(Math.abs(sweep) * r / segLen)), Math.ceil(Math.abs(sweep) / (TAU / 96)));
+  const pts = [];
+  for (let k = 0; k <= n; k++) { const t = a0 + sweep * k / n; pts.push([cx + Math.cos(t) * r, cy + Math.sin(t) * r]); }
+  return pts;
+}
+
+/* =====================================================================
+   Excellon drill parser
+   ===================================================================== */
+function parseExcellon(text, name) {
+  let unit = 25.4, zeros = 'LZ', fi = 2, fd = 4, fmtSet = false, plated = /npth|non.?plated|unplated/i.test(name) ? false : true;
+  const tools = {}; let cur = null, x = 0, y = 0, route = false, down = false;
+  const holes = [];
+  const pnum = (s) => {
+    if (s.includes('.')) return parseFloat(s) * unit;
+    let neg = false; if (s[0] === '-' || s[0] === '+') { neg = s[0] === '-'; s = s.slice(1); }
+    if (zeros === 'LZ') s = s.padEnd(fi + fd, '0');
+    const v = parseInt(s, 10) / Math.pow(10, fd);
+    return (neg ? -v : v) * unit;
+  };
+  const xy = (s) => {
+    const mx = s.match(/X([+-]?[\d.]+)/), my = s.match(/Y([+-]?[\d.]+)/);
+    return [mx ? pnum(mx[1]) : x, my ? pnum(my[1]) : y];
+  };
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim().toUpperCase();
+    if (!line) continue;
+    if (line.startsWith(';')) {
+      const m = line.match(/FILE_FORMAT\s*=\s*(\d+):(\d+)/); if (m) { fi = +m[1]; fd = +m[2]; fmtSet = true; }
+      if (/TYPE=NON_PLATED|NPTH/.test(line)) plated = false;
+      continue;
+    }
+    if (/^(METRIC|M71)/.test(line)) {
+      unit = 1; if (!fmtSet) { fi = 3; fd = 3; }
+      const f = line.match(/(0+)\.(0+)/); if (f) { fi = f[1].length; fd = f[2].length; fmtSet = true; }
+      if (line.includes('TZ')) zeros = 'TZ'; else if (line.includes('LZ')) zeros = 'LZ';
+      continue;
+    }
+    if (/^(INCH|M72)/.test(line)) {
+      unit = 25.4; if (!fmtSet) { fi = 2; fd = 4; }
+      const f = line.match(/(0+)\.(0+)/); if (f) { fi = f[1].length; fd = f[2].length; fmtSet = true; }
+      if (line.includes('TZ')) zeros = 'TZ'; else if (line.includes('LZ')) zeros = 'LZ';
+      continue;
+    }
+    const td = line.match(/^T(\d+)(?:[FSBHZ][\d.]*)*C([\d.]+)/);
+    if (td) { tools[+td[1]] = parseFloat(td[2]) * unit; if (/[XY]/.test(line.slice(td[0].length))) {} else continue; }
+    const ts = line.match(/^T(\d+)$/); if (ts) { cur = +ts[1] || null; continue; }
+    if (/^(M48|M95|%|G90|G05|M30|M00|FMAT|ICI|M47|G93|VER|DETECT|ATC|OFF)/.test(line) && !/[XY][+-]?\d/.test(line)) {
+      if (line.startsWith('G05')) route = false;
+      continue;
+    }
+    if (line.includes('G85')) {
+      const [a, b] = line.split('G85');
+      const [x1, y1] = xy(a); x = x1; y = y1; const [x2, y2] = xy(b); x = x2; y = y2;
+      if (cur && tools[cur]) holes.push({ x: x1, y: y1, x2, y2, d: tools[cur], plated });
+      continue;
+    }
+    if (line.startsWith('G00')) { route = true; down = false; [x, y] = xy(line); continue; }
+    if (line.includes('M15')) { down = true; }
+    if (line.includes('M16') || line.includes('M17')) { down = false; continue; }
+    if (/[XY][+-]?[\d.]/.test(line)) {
+      const px = x, py = y; [x, y] = xy(line);
+      if (!cur || !tools[cur]) continue;
+      if (route) { if (down && (line.startsWith('G01') || /^[XY]/.test(line))) holes.push({ x: px, y: py, x2: x, y2: y, d: tools[cur], plated }); }
+      else holes.push({ x, y, d: tools[cur], plated });
+    }
+  }
+  return { holes };
+}
+
+/* =====================================================================
+   Layer type detection
+   ===================================================================== */
+const TYPES = {
+  'top-copper':    { label: 'Top copper',    color: '#c8873a' },
+  'top-mask':      { label: 'Top mask',      color: '#2e7d4f' },
+  'top-silk':      { label: 'Top silk',      color: '#f4f4f2' },
+  'top-paste':     { label: 'Top paste',     color: '#9ca3af' },
+  'bottom-copper': { label: 'Bottom copper', color: '#2f6fb5' },
+  'bottom-mask':   { label: 'Bottom mask',   color: '#1f5a3a' },
+  'bottom-silk':   { label: 'Bottom silk',   color: '#d6d3d1' },
+  'bottom-paste':  { label: 'Bottom paste',  color: '#6b7280' },
+  'inner':         { label: 'Inner copper',  color: '#a855f7' },
+  'outline':       { label: 'Outline',       color: '#eab308' },
+  'drill':         { label: 'Drill (PTH)',   color: '#111827' },
+  'drill-npth':    { label: 'Drill (NPTH)',  color: '#4b5563' },
+  'drill-gerber':  { label: 'Drill (Gerber)',color: '#374151' },
+  'ignore':        { label: 'Ignore',        color: 'transparent' },
+};
+
+function detectType(name, text) {
+  const n = name.toLowerCase(), ext = n.includes('.') ? n.split('.').pop() : '';
+  const head = text.slice(0, 4000);
+  const isExcellon = /^\s*(;[^\n]*\n\s*)*M48/m.test(head) || (/^\s*(METRIC|INCH)/m.test(head) && /^T\d+.*C[\d.]+/m.test(head));
+  if (isExcellon) return /npth|non.?plated|unplated/i.test(n) || /TYPE=NON_PLATED/i.test(head) ? 'drill-npth' : 'drill';
+  const isGerber = /%FS|%MO|G04|%AD/.test(head);
+  if (!isGerber) return 'ignore';
+  const ff = head.match(/%TF\.FileFunction,([^*%]+)/);
+  if (ff) {
+    const f = ff[1].toLowerCase().split(',');
+    const side = (f[f.length - 1] === 'top' || f[1] === 'top') ? 'top' : (f.includes('bot') || f[1] === 'bot') ? 'bottom' : null;
+    if (f[0] === 'copper') { const s = (f[2] || '').toLowerCase(); return s.startsWith('top') ? 'top-copper' : s.startsWith('bot') ? 'bottom-copper' : 'inner'; }
+    if (f[0] === 'soldermask' && side) return side + '-mask';
+    if (f[0] === 'legend' && side) return side + '-silk';
+    if (f[0] === 'paste' && side) return side + '-paste';
+    if (f[0] === 'profile') return 'outline';
+    if (f[0] === 'plated' || f[0] === 'nonplated') return 'drill-gerber';
+  }
+  const has = re => re.test(n);
+  if (has(/edge[._ -]?cuts|outline|profile|board[._ -]?shape|\.(gko|gm1|gml|dim|oln|bdr|mill)$/)) return 'outline';
+  if (has(/f[._]mask|top[._ -]?(solder)?[._ -]?mask|(solder)?mask[._ -]?top|\.(gts|stc|smt|tsm)$/)) return 'top-mask';
+  if (has(/b[._]mask|bot(tom)?[._ -]?(solder)?[._ -]?mask|(solder)?mask[._ -]?bot|\.(gbs|sts|smb|bsm)$/)) return 'bottom-mask';
+  if (has(/f[._]silk|top[._ -]?silk|silk[a-z]*[._ -]?top|top[._ -]?legend|\.(gto|plc|sst|tsk)$/)) return 'top-silk';
+  if (has(/b[._]silk|bot(tom)?[._ -]?silk|silk[a-z]*[._ -]?bot|bot(tom)?[._ -]?legend|\.(gbo|pls|ssb|bsk)$/)) return 'bottom-silk';
+  if (has(/f[._]paste|top[._ -]?paste|paste[._ -]?top|\.(gtp|crc|spt|tsp)$/)) return 'top-paste';
+  if (has(/b[._]paste|bot(tom)?[._ -]?paste|paste[._ -]?bot|\.(gbp|crs|spb|bsp)$/)) return 'bottom-paste';
+  if (has(/in\d+[._]cu|inner|\.g\d+$|\.gp\d+$|\.ly\d+$/)) return 'inner';
+  if (has(/f[._]cu|top[._ -]?(copper|layer)|copper[._ -]?top|\.(gtl|cmp|top|tcu)$/)) return 'top-copper';
+  if (has(/b[._]cu|bot(tom)?[._ -]?(copper|layer)|copper[._ -]?bot|\.(gbl|sol|bot|bcu)$/)) return 'bottom-copper';
+  if (has(/drill|\.(drl|xln|drd)$/)) return 'drill-gerber';
+  return 'ignore';
+}
+
+/* =====================================================================
+   Rasterising a layer onto a canvas (alpha mask, white = present)
+   ===================================================================== */
+function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+
+function apPath(ctx, ap, x, y) {
+  ctx.beginPath();
+  let eo = false;
+  if (ap.t === 'C') ctx.arc(x, y, ap.d / 2, 0, TAU);
+  else if (ap.t === 'R') ctx.rect(x - ap.w / 2, y - ap.h / 2, ap.w, ap.h);
+  else if (ap.t === 'O') capsule(ctx, x, y, ap.w, ap.h);
+  else if (ap.t === 'P') { for (let k = 0; k < ap.n; k++) { const t = (ap.rot * Math.PI / 180) + k / ap.n * TAU; const px = x + Math.cos(t) * ap.d / 2, py = y + Math.sin(t) * ap.d / 2; k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.closePath(); }
+  if (ap.hd > 0) { ctx.moveTo(x + ap.hd / 2, y); ctx.arc(x, y, ap.hd / 2, 0, TAU); eo = true; }
+  return eo;
+}
+function capsule(ctx, x, y, w, h) {
+  if (w >= h) { const r = h / 2, dx = w / 2 - r; ctx.moveTo(x - dx, y - r); ctx.lineTo(x + dx, y - r); ctx.arc(x + dx, y, r, -Math.PI / 2, Math.PI / 2); ctx.lineTo(x - dx, y + r); ctx.arc(x - dx, y, r, Math.PI / 2, Math.PI * 1.5); }
+  else { const r = w / 2, dy = h / 2 - r; ctx.moveTo(x + r, y - dy); ctx.lineTo(x + r, y + dy); ctx.arc(x, y + dy, r, 0, Math.PI); ctx.lineTo(x - r, y - dy); ctx.arc(x, y - dy, r, Math.PI, TAU); }
+  ctx.closePath();
+}
+function hull(pts) {
+  pts = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const p of pts) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+  for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+function polyPath(ctx, pts) { ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); }
+
+function primPath(ctx, p) {
+  if (p.k === 'c') { ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); }
+  else polyPath(ctx, p.pts);
+}
+
+function drawMacroFlash(ctx, ap, x, y, view) {
+  const u = ap.u;
+  if (ap.simple) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(u, u);
+    for (const p of ap.prims) { primPath(ctx, p); ctx.fill(); }
+    ctx.restore(); return;
+  }
+  // Composite on an offscreen canvas so clear primitives only affect this aperture
+  const s = view.s, pad = 2;
+  const bx0 = x + ap.bb[0] * u, by1 = y + ap.bb[3] * u;
+  const w = Math.ceil((ap.bb[2] - ap.bb[0]) * u * s) + pad * 2, h = Math.ceil((ap.bb[3] - ap.bb[1]) * u * s) + pad * 2;
+  if (w < 1 || h < 1 || w > 8192 || h > 8192) return;
+  const oc = makeCanvas(w, h), o = oc.getContext('2d');
+  o.setTransform(s * u, 0, 0, -s * u, pad - ap.bb[0] * s * u, pad + ap.bb[3] * s * u);
+  o.fillStyle = '#fff';
+  for (const p of ap.prims) {
+    if (p.k === 't') {
+      const [cx, cy] = rot2(p.cx, p.cy, p.rot);
+      o.globalCompositeOperation = 'source-over';
+      o.beginPath(); o.arc(cx, cy, p.od / 2, 0, TAU); o.moveTo(cx + p.id / 2, cy); o.arc(cx, cy, p.id / 2, 0, TAU); o.fill('evenodd');
+      o.globalCompositeOperation = 'destination-out';
+      for (const ang of [0, 90]) {
+        const L = p.od, g = p.gap / 2;
+        const pts = [[-L, -g], [L, -g], [L, g], [-L, g]].map(q => { const r = rot2(q[0], q[1], ang + p.rot); return [r[0] + cx, r[1] + cy]; });
+        polyPath(o, pts); o.fill();
+      }
+      continue;
+    }
+    o.globalCompositeOperation = p.exp ? 'source-over' : 'destination-out';
+    primPath(o, p); o.fill();
+  }
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(oc, (bx0 - view.minX) * s - pad, (view.maxY - by1) * s - pad);
+  ctx.restore();
+}
+
+function renderOps(ctx, ops, view) {
+  ctx.setTransform(view.s, 0, 0, -view.s, -view.minX * view.s, view.maxY * view.s);
+  ctx.fillStyle = ctx.strokeStyle = '#fff';
+  ctx.lineJoin = 'round';
+  for (const o of ops) {
+    ctx.globalCompositeOperation = o.dark ? 'source-over' : 'destination-out';
+    if (o.t === 'flash') {
+      if (o.ap.t === 'M') drawMacroFlash(ctx, o.ap, o.x, o.y, view);
+      else { const eo = apPath(ctx, o.ap, o.x, o.y); ctx.fill(eo ? 'evenodd' : 'nonzero'); }
+    } else if (o.t === 'line') {
+      const ap = o.ap;
+      if (ap.t === 'R') {
+        const hw = ap.w / 2, hh = ap.h / 2, c = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]];
+        polyPath(ctx, hull(c.map(p => [p[0] + o.x1, p[1] + o.y1]).concat(c.map(p => [p[0] + o.x2, p[1] + o.y2])))); ctx.fill();
+      } else {
+        const w = ap.t === 'C' ? ap.d : ap.t === 'O' ? Math.min(ap.w, ap.h) : ap.t === 'P' ? ap.d : 0.1;
+        if (Math.hypot(o.x2 - o.x1, o.y2 - o.y1) < 1e-9) { ctx.beginPath(); ctx.arc(o.x1, o.y1, w / 2, 0, TAU); ctx.fill(); continue; }
+        ctx.lineWidth = Math.max(w, 1e-4); ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(o.x1, o.y1); ctx.lineTo(o.x2, o.y2); ctx.stroke();
+      }
+    } else if (o.t === 'arc') {
+      const ap = o.ap, w = ap.t === 'C' ? ap.d : ap.t === 'R' || ap.t === 'O' ? Math.min(ap.w, ap.h) : 0.1;
+      ctx.lineWidth = Math.max(w, 1e-4); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(o.cx, o.cy, o.r, o.a0, o.a1, o.a1 < o.a0); ctx.stroke();
+    } else if (o.t === 'region') {
+      for (const c of o.contours) {
+        ctx.beginPath();
+        for (const sgm of c) {
+          if (sgm.t === 'M') ctx.moveTo(sgm.x, sgm.y);
+          else if (sgm.t === 'L') ctx.lineTo(sgm.x, sgm.y);
+          else ctx.arc(sgm.cx, sgm.cy, sgm.r, sgm.a0, sgm.a1, sgm.a1 < sgm.a0);
+        }
+        ctx.closePath(); ctx.fill();
+      }
+    }
+  }
+  ctx.globalCompositeOperation = 'source-over';
+}
+
+/* =====================================================================
+   Board outline extraction
+   ===================================================================== */
+function outlineSegments(ops) {
+  const segs = [];
+  for (const o of ops) {
+    if (o.t === 'line') { if (Math.hypot(o.x2 - o.x1, o.y2 - o.y1) > 1e-6) segs.push([[o.x1, o.y1], [o.x2, o.y2]]); }
+    else if (o.t === 'arc') segs.push(arcPoints(o.cx, o.cy, o.r, o.a0, o.a1));
+    else if (o.t === 'region') for (const c of o.contours) {
+      const pts = [];
+      for (const s of c) { if (s.t === 'A') pts.push(...arcPoints(s.cx, s.cy, s.r, s.a0, s.a1).slice(1)); else pts.push([s.x, s.y]); }
+      pts.push(pts[0]); segs.push(pts);
+    }
+  }
+  return segs;
+}
+const d2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+function chainLoops(segs) {
+  const tol = 0.05, closeTol = 0.25, used = new Array(segs.length).fill(false), loops = [];
+  for (let k = 0; k < segs.length; k++) {
+    if (used[k]) continue; used[k] = true;
+    let pts = segs[k].slice(), flipped = false;
+    for (;;) {
+      if (pts.length > 2 && d2(pts[0], pts[pts.length - 1]) < tol) break;
+      const end = pts[pts.length - 1]; let found = false;
+      for (let m = 0; m < segs.length; m++) {
+        if (used[m]) continue; const s = segs[m];
+        if (d2(s[0], end) < tol) { pts.push(...s.slice(1)); used[m] = true; found = true; break; }
+        if (d2(s[s.length - 1], end) < tol) { pts.push(...s.slice().reverse().slice(1)); used[m] = true; found = true; break; }
+      }
+      if (!found) { if (flipped) break; pts.reverse(); flipped = true; }
+    }
+    if (pts.length > 2 && d2(pts[0], pts[pts.length - 1]) < closeTol) {
+      pts.pop();
+      const clean = [pts[0]]; for (const p of pts) if (d2(p, clean[clean.length - 1]) > 1e-4) clean.push(p);
+      if (clean.length > 2 && d2(clean[0], clean[clean.length - 1]) < 1e-4) clean.pop();
+      if (clean.length > 2) loops.push(clean);
+    }
+  }
+  return loops;
+}
+function polyArea(p) { let a = 0; for (let i = 0, j = p.length - 1; i < p.length; j = i++) a += (p[j][0] + p[i][0]) * (p[j][1] - p[i][1]); return a / 2; }
+function pip(pt, poly) {
+  let ins = false; const [x, y] = pt;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) ins = !ins;
+  }
+  return ins;
+}
+function distToPoly(pt, poly) {
+  let m = Infinity; const [px, py] = pt;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [ax, ay] = poly[j], [bx, by] = poly[i], dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy;
+    let t = L ? ((px - ax) * dx + (py - ay) * dy) / L : 0; t = Math.max(0, Math.min(1, t));
+    m = Math.min(m, Math.hypot(px - ax - t * dx, py - ay - t * dy));
+  }
+  return m;
+}
+function polyBounds(p) { const b = [Infinity, Infinity, -Infinity, -Infinity]; for (const [x, y] of p) { b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y); } return b; }
+
+/* =====================================================================
+   App state
+   ===================================================================== */
+const state = {
+  files: [],          // {id, name, text, type, parsed, err}
+  mask: '#1d5a2c', finish: 'enig', silk: '#f4f4f2', thick: 1.6,
+  show: { mask: true, silk: true, cu: true, holes: true },
+  board: null, flipped: false,
+};
+const MASKS = [['#1d5a2c', 'Green'], ['#8f1f1f', 'Red'], ['#1d3f8f', 'Blue'], ['#151515', 'Black'], ['#efefef', 'White'], ['#4b2a73', 'Purple'], ['#d7b81c', 'Yellow']];
+const FINISH = { enig: '#d1a85a', hasl: '#c9ccd1', copper: '#c27a45' };
+const FR4 = '#b8a46e';
+
+/* ---------- Three.js scene ---------- */
+const viewEl = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+viewEl.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#e8e9ed');
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 5000);
+camera.position.set(0, 60, 60);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.09; controls.screenSpacePanning = true;
+// Lights travel with the camera so every side of the board is lit the same way
+scene.add(camera);
+const lightTarget = new THREE.Object3D(); lightTarget.position.set(0, 0, -1); camera.add(lightTarget);
+const key = new THREE.DirectionalLight(0xffffff, 1.5); key.position.set(-0.6, 0.8, 0.4); key.target = lightTarget; camera.add(key);
+const fill = new THREE.DirectionalLight(0xffffff, 0.45); fill.position.set(0.8, -0.3, 0.3); fill.target = lightTarget; camera.add(fill);
+scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+const boardRoot = new THREE.Group(); scene.add(boardRoot);
+const maxTex = Math.min(renderer.capabilities.maxTextureSize, 4096);
+
+function resize() {
+  const w = viewEl.clientWidth, h = viewEl.clientHeight; if (!w || !h) return;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(viewEl); resize();
+
+let tween = null;
+function animate(t) {
+  requestAnimationFrame(animate);
+  if (tween) {
+    const k = Math.min(1, (t - tween.t0) / 550), e = 1 - Math.pow(1 - k, 3);
+    camera.position.lerpVectors(tween.p0, tween.p1, e);
+    controls.target.lerpVectors(tween.c0, tween.c1, e);
+    camera.up.lerpVectors(tween.u0, tween.u1, e).normalize();
+    if (k >= 1) tween = null;
+  }
+  controls.update(); renderer.render(scene, camera);
+}
+requestAnimationFrame(animate);
+
+function setView(kind, instant) {
+  const b = state.board; const size = b ? Math.max(b.w, b.h) : 40;
+  const dist = size / (2 * Math.tan(camera.fov * Math.PI / 360)) * 1.35 / Math.min(1, camera.aspect);
+  let dir, up = new THREE.Vector3(0, 1, 0);
+  if (kind === 'top') { dir = new THREE.Vector3(0, 1, 0); up = new THREE.Vector3(0, 0, -1); }
+  else if (kind === 'bottom') { dir = new THREE.Vector3(0, -1, 0); up = new THREE.Vector3(0, 0, -1); }
+  else dir = new THREE.Vector3(-0.35, 1.1, 0.95).normalize();
+  const p1 = dir.multiplyScalar(dist);
+  if (instant) { camera.position.copy(p1); controls.target.set(0, 0, 0); camera.up.copy(up); return; }
+  tween = { t0: performance.now(), p0: camera.position.clone(), p1, c0: controls.target.clone(), c1: new THREE.Vector3(), u0: camera.up.clone(), u1: up };
+}
+
+/* ---------- Build board ---------- */
+function layersOf(type) { return state.files.filter(f => f.type === type && f.parsed && !f.err); }
+function opsOf(type) { return layersOf(type).flatMap(f => f.parsed.ops || []); }
+
+function parseFile(f) {
+  const kind = (f.type === 'drill' || f.type === 'drill-npth') ? 'excellon' : f.type === 'ignore' ? null : 'gerber';
+  if (!kind) { f.parsed = null; f.err = null; return; }
+  if (f.parsed && f.parsedAs === kind) return;
+  try {
+    f.parsed = kind === 'excellon' ? parseExcellon(f.text, f.name) : parseGerber(f.text);
+    f.parsedAs = kind; f.err = null;
+  } catch (e) { f.parsed = null; f.err = e.message || String(e); }
+}
+
+function collectHoles() {
+  const holes = [];
+  for (const f of state.files) {
+    if (!f.parsed || f.err) continue;
+    if (f.type === 'drill' || f.type === 'drill-npth') for (const h of f.parsed.holes) holes.push({ ...h, plated: f.type === 'drill' ? h.plated : false });
+    if (f.type === 'drill-gerber') {
+      const np = /non.?plated|npth/i.test(f.parsed.attrs?.FileFunction || '') || /npth/i.test(f.name);
+      for (const o of f.parsed.ops) {
+        if (o.t === 'flash' && o.dark) holes.push({ x: o.x, y: o.y, d: apSize(o.ap), plated: !np });
+        else if (o.t === 'line' && o.dark) holes.push({ x: o.x1, y: o.y1, x2: o.x2, y2: o.y2, d: apSize(o.ap), plated: !np });
+      }
+    }
+  }
+  return holes.filter(h => h.d > 0.01);
+}
+
+function holePolygon(h, cx, cy) {
+  const r = h.d / 2, n = Math.max(16, Math.min(64, Math.round(r * 40)));
+  if (h.x2 == null || Math.hypot(h.x2 - h.x, h.y2 - h.y) < 1e-6) {
+    const pts = []; for (let k = 0; k < n; k++) { const t = k / n * TAU; pts.push(new THREE.Vector2(h.x - cx + Math.cos(t) * r, h.y - cy + Math.sin(t) * r)); }
+    return pts;
+  }
+  const a = Math.atan2(h.y2 - h.y, h.x2 - h.x), pts = [], half = Math.ceil(n / 2);
+  for (let k = 0; k <= half; k++) { const t = a + Math.PI / 2 + k / half * Math.PI; pts.push(new THREE.Vector2(h.x - cx + Math.cos(t) * r, h.y - cy + Math.sin(t) * r)); }
+  for (let k = 0; k <= half; k++) { const t = a - Math.PI / 2 + k / half * Math.PI; pts.push(new THREE.Vector2(h.x2 - cx + Math.cos(t) * r, h.y2 - cy + Math.sin(t) * r)); }
+  return pts;
+}
+
+function tinted(src, color, scratch) {
+  const c = scratch || makeCanvas(src.width, src.height), x = c.getContext('2d');
+  x.globalCompositeOperation = 'source-over'; x.clearRect(0, 0, c.width, c.height);
+  x.fillStyle = color; x.fillRect(0, 0, c.width, c.height);
+  x.globalCompositeOperation = 'destination-in'; x.drawImage(src, 0, 0);
+  x.globalCompositeOperation = 'source-over';
+  return c;
+}
+function mixHex(a, b, t) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ch = s => [(s >> 16) & 255, (s >> 8) & 255, s & 255];
+  const A = ch(pa), B = ch(pb);
+  return 'rgb(' + A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',') + ')';
+}
+
+let built = null; // geometry/raster cache for appearance-only updates
+
+function buildBoard() {
+  for (const f of state.files) parseFile(f);
+  boardRoot.clear();
+  const hasAny = state.files.some(f => f.parsed && f.type !== 'ignore');
+  document.getElementById('empty').style.display = hasAny ? 'none' : 'flex';
+  if (!hasAny) { state.board = null; built = null; updateInfo(); return; }
+
+  // ---- outline
+  let outer = null, cutouts = [];
+  const oSegs = outlineSegments(opsOf('outline'));
+  const loops = chainLoops(oSegs).map(p => ({ p, a: Math.abs(polyArea(p)) })).sort((a, b) => b.a - a.a);
+  if (loops.length) {
+    outer = loops[0].p;
+    for (const l of loops.slice(1)) {
+      if (l.a > loops[0].a * 0.95) continue;
+      if (pip(l.p[0], outer) && !cutouts.some(c => pip(l.p[0], c))) cutouts.push(l.p);
+    }
+  }
+  let b;
+  if (outer) b = polyBounds(outer);
+  else {
+    b = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const t of ['top-copper', 'bottom-copper', 'top-mask', 'bottom-mask', 'top-silk', 'bottom-silk', 'outline', 'inner']) {
+      const ob = opsBounds(opsOf(t)); b = [Math.min(b[0], ob[0]), Math.min(b[1], ob[1]), Math.max(b[2], ob[2]), Math.max(b[3], ob[3])];
+    }
+    for (const h of collectHoles()) { b[0] = Math.min(b[0], h.x - h.d); b[1] = Math.min(b[1], h.y - h.d); b[2] = Math.max(b[2], h.x + h.d); b[3] = Math.max(b[3], h.y + h.d); }
+    if (!isFinite(b[0])) { state.board = null; updateInfo(); return; }
+    b = [b[0] - 1, b[1] - 1, b[2] + 1, b[3] + 1];
+    outer = [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]];
+  }
+  const W = b[2] - b[0], H = b[3] - b[1], cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
+  state.board = { w: W, h: H, hasOutline: loops.length > 0, cutouts: cutouts.length };
+
+  // ---- raster view
+  const s = Math.min(maxTex / Math.max(W, H), 120);
+  const view = { minX: b[0], maxY: b[3], s, W: Math.max(4, Math.round(W * s)), H: Math.max(4, Math.round(H * s)) };
+  const raster = {};
+  for (const t of ['top-copper', 'top-mask', 'top-silk', 'bottom-copper', 'bottom-mask', 'bottom-silk']) {
+    const ops = opsOf(t); if (!ops.length) continue;
+    const c = makeCanvas(view.W, view.H); renderOps(c.getContext('2d'), ops, view); raster[t] = c;
+  }
+
+  // ---- holes: which can be cut into the geometry
+  const holes = collectHoles();
+  const cut = [], painted = [];
+  const grid = new Map(), G = 2;
+  const keyOf = (x, y) => Math.floor(x / G) + ',' + Math.floor(y / G);
+  for (const h of holes) {
+    const r = h.d / 2, ends = h.x2 != null ? [[h.x, h.y], [h.x2, h.y2]] : [[h.x, h.y]];
+    const inside = ends.every(p => pip(p, outer) && distToPoly(p, outer) > r + 0.03 && cutouts.every(c => !pip(p, c) && distToPoly(p, c) > r + 0.03));
+    if (!ends.some(p => pip(p, outer))) continue;
+    let clash = false;
+    if (inside) {
+      const gx = Math.floor(h.x / G), gy = Math.floor(h.y / G);
+      outer: for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
+        for (const o of grid.get((gx + i) + ',' + (gy + j)) || []) {
+          const dd = Math.hypot(o.x - h.x, o.y - h.y) - (o.d + h.d) / 2;
+          if (dd < 0.03 || o.x2 != null || h.x2 != null && dd < h.d * 2) { clash = true; break outer; }
+        }
+      }
+    }
+    if (inside && !clash && cut.length < 4000) { cut.push(h); const k = keyOf(h.x, h.y); (grid.get(k) || grid.set(k, []).get(k)).push(h); }
+    else painted.push(h);
+  }
+
+  built = { view, raster, outer, cutouts, cut, painted, cx, cy, b, W, H };
+  buildGeometry();
+  updateInfo(holes.length);
+}
+
+function composeSide(side) {
+  const { view, raster, painted } = built;
+  const cu = state.show.cu ? raster[side + '-copper'] : null;
+  const mask = raster[side + '-mask'];
+  const silk = state.show.silk ? raster[side + '-silk'] : null;
+  const maskOn = state.show.mask && !!mask;
+  const finish = FINISH[state.finish];
+  const col = makeCanvas(view.W, view.H), cx = col.getContext('2d');
+  const pbr = makeCanvas(view.W, view.H), px = pbr.getContext('2d');   // R=bump, G=roughness, B=metalness
+  const tmp = makeCanvas(view.W, view.H), tmp2 = makeCanvas(view.W, view.H);
+
+  if (maskOn) {
+    cx.fillStyle = state.mask; cx.fillRect(0, 0, view.W, view.H);
+    px.fillStyle = 'rgb(0,120,0)'; px.fillRect(0, 0, view.W, view.H);
+    if (cu) {
+      cx.drawImage(tinted(cu, mixHex(state.mask, '#ffffff', state.mask === '#efefef' ? 0 : 0.16), tmp), 0, 0);
+      px.drawImage(tinted(cu, 'rgb(150,110,0)', tmp), 0, 0);
+    }
+    // Openings: bare laminate, then finished copper
+    cx.drawImage(tinted(mask, FR4, tmp), 0, 0);
+    px.drawImage(tinted(mask, 'rgb(20,200,0)', tmp), 0, 0);
+    if (cu) {
+      const ex = tinted(cu, finish, tmp); const ec = ex.getContext('2d');
+      ec.globalCompositeOperation = 'destination-in'; ec.drawImage(mask, 0, 0); ec.globalCompositeOperation = 'source-over';
+      cx.drawImage(ex, 0, 0);
+      const ep = tinted(cu, state.finish === 'hasl' ? 'rgb(170,95,255)' : 'rgb(170,70,255)', tmp2); const epc = ep.getContext('2d');
+      epc.globalCompositeOperation = 'destination-in'; epc.drawImage(mask, 0, 0); epc.globalCompositeOperation = 'source-over';
+      px.drawImage(ep, 0, 0);
+    }
+  } else {
+    cx.fillStyle = FR4; cx.fillRect(0, 0, view.W, view.H);
+    px.fillStyle = 'rgb(0,200,0)'; px.fillRect(0, 0, view.W, view.H);
+    if (cu) { cx.drawImage(tinted(cu, finish, tmp), 0, 0); px.drawImage(tinted(cu, 'rgb(150,70,255)', tmp), 0, 0); }
+  }
+  if (silk) {
+    const sc = tinted(silk, state.silk, tmp), scx = sc.getContext('2d');
+    if (maskOn) { scx.globalCompositeOperation = 'destination-out'; scx.drawImage(mask, 0, 0); scx.globalCompositeOperation = 'source-over'; }
+    cx.drawImage(sc, 0, 0);
+    const sp = tinted(silk, 'rgb(215,235,0)', tmp2), spx = sp.getContext('2d');
+    if (maskOn) { spx.globalCompositeOperation = 'destination-out'; spx.drawImage(mask, 0, 0); spx.globalCompositeOperation = 'source-over'; }
+    px.drawImage(sp, 0, 0);
+  }
+  // Holes that could not be cut into the geometry are painted flat
+  if (state.show.holes && painted.length) {
+    const T = [view.s, 0, 0, -view.s, -view.minX * view.s, view.maxY * view.s];
+    for (const [c, colr] of [[cx, '#16181c'], [px, 'rgb(0,230,0)']]) {
+      c.setTransform(...T); c.fillStyle = colr; c.strokeStyle = colr; c.lineCap = 'round';
+      for (const h of painted) {
+        if (h.x2 != null) { c.lineWidth = h.d; c.beginPath(); c.moveTo(h.x, h.y); c.lineTo(h.x2, h.y2); c.stroke(); }
+        else { c.beginPath(); c.arc(h.x, h.y, h.d / 2, 0, TAU); c.fill(); }
+      }
+      c.setTransform(1, 0, 0, 1, 0, 0);
+    }
+  }
+  const map = new THREE.CanvasTexture(col); map.colorSpace = THREE.SRGBColorSpace;
+  const pt = new THREE.CanvasTexture(pbr); pt.colorSpace = THREE.NoColorSpace;
+  for (const t of [map, pt]) { t.anisotropy = renderer.capabilities.getMaxAnisotropy(); t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; }
+  return new THREE.MeshStandardMaterial({
+    map, roughnessMap: pt, metalnessMap: pt, bumpMap: pt, bumpScale: 1.6,
+    roughness: 1, metalness: 1, envMapIntensity: 1.0,
+  });
+}
+
+function buildGeometry() {
+  if (!built) return;
+  boardRoot.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) [].concat(o.material).forEach(m => { m.map?.dispose(); m.roughnessMap?.dispose(); m.dispose(); }); });
+  boardRoot.clear();
+  const { outer, cutouts, cut, cx, cy, b, W, H } = built;
+  const t = state.thick;
+  const toV = p => new THREE.Vector2(p[0] - cx, p[1] - cy);
+  const shape = new THREE.Shape(outer.map(toV));
+  for (const c of cutouts) shape.holes.push(new THREE.Path(c.map(toV)));
+  const useHoles = state.show.holes ? cut : [];
+  for (const h of useHoles) shape.holes.push(new THREE.Path(holePolygon(h, cx, cy)));
+  let geo;
+  try { geo = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false, curveSegments: 1 }); }
+  catch (e) { console.warn('Triangulation failed, retrying without holes', e); shape.holes = cutouts.map(c => new THREE.Path(c.map(toV))); geo = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false, curveSegments: 1 }); }
+
+  // UVs from board coordinates; split caps into top/bottom groups
+  const pos = geo.attributes.position, uv = geo.attributes.uv;
+  for (let i = 0; i < pos.count; i++) uv.setXY(i, (pos.getX(i) + cx - b[0]) / W, (pos.getY(i) + cy - b[1]) / H);
+  uv.needsUpdate = true;
+  const groups = geo.groups.slice(); geo.clearGroups();
+  for (const g of groups) {
+    if (g.materialIndex !== 0) { geo.addGroup(g.start, g.count, 1); continue; }
+    let runStart = g.start, runMat = null;
+    for (let i = g.start; i < g.start + g.count; i += 3) {
+      const m = pos.getZ(i) > t / 2 ? 0 : 2;
+      if (runMat === null) runMat = m;
+      if (m !== runMat) { geo.addGroup(runStart, i - runStart, runMat); runStart = i; runMat = m; }
+    }
+    if (runMat !== null) geo.addGroup(runStart, g.start + g.count - runStart, runMat);
+  }
+  geo.computeVertexNormals();
+
+  const top = composeSide('top'), bot = composeSide('bottom');
+  const edge = new THREE.MeshStandardMaterial({ color: '#7a6c45', roughness: 0.85, metalness: 0 });
+  const mesh = new THREE.Mesh(geo, [top, edge, bot]);
+  mesh.position.z = -t / 2;
+
+  const g = new THREE.Group(); g.add(mesh);
+  // Plated barrels
+  const plated = useHoles.filter(h => h.plated && h.x2 == null);
+  if (plated.length) {
+    const cyl = new THREE.CylinderGeometry(1, 1, 1, 28, 1, true); cyl.rotateX(Math.PI / 2);
+    const mat = new THREE.MeshStandardMaterial({ color: state.finish === 'hasl' ? '#9da2a8' : '#a07a40', metalness: 1, roughness: 0.45, side: THREE.DoubleSide });
+    const im = new THREE.InstancedMesh(cyl, mat, plated.length), m4 = new THREE.Matrix4();
+    plated.forEach((h, i) => { const r = h.d / 2 - 0.004; m4.makeScale(r, r, t * 0.998); m4.setPosition(h.x - cx, h.y - cy, 0); im.setMatrixAt(i, m4); });
+    g.add(im);
+  }
+  g.rotation.x = -Math.PI / 2;
+  if (state.flipped) g.rotation.z = 0, g.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), Math.PI);
+  boardRoot.add(g);
+}
+
+/* ---------- UI ---------- */
+const filesEl = document.getElementById('files');
+function renderFiles() {
+  if (!state.files.length) { filesEl.innerHTML = '<div style="color:var(--muted);font-size:12px">No files loaded.</div>'; return; }
+  filesEl.innerHTML = '';
+  const order = Object.keys(TYPES);
+  const sorted = state.files.slice().sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type) || a.name.localeCompare(b.name));
+  for (const f of sorted) {
+    const el = document.createElement('div'); el.className = 'file';
+    const nm = document.createElement('div'); nm.className = 'nm'; nm.title = f.name;
+    nm.innerHTML = `<span class="dot" style="background:${TYPES[f.type].color}"></span>`; nm.append(f.name);
+    const sel = document.createElement('select');
+    for (const [k, v] of Object.entries(TYPES)) { const o = document.createElement('option'); o.value = k; o.textContent = v.label; if (k === f.type) o.selected = true; sel.append(o); }
+    sel.onchange = () => { f.type = sel.value; rebuild(); };
+    const stt = document.createElement('div'); stt.className = 'st';
+    if (f.err) { stt.className += ' err'; stt.textContent = 'Parse error: ' + f.err; }
+    else if (f.type === 'ignore') stt.textContent = 'Not rendered';
+    else if (f.parsed?.holes) stt.textContent = f.parsed.holes.length + ' holes';
+    else if (f.parsed?.ops) stt.textContent = f.parsed.ops.length + ' objects' + (f.parsed.warnings?.length ? ' · ' + f.parsed.warnings.join('; ') : '');
+    el.append(nm, sel, stt); filesEl.append(el);
+  }
+}
+function updateInfo(nHoles) {
+  const info = document.getElementById('info'), b = state.board;
+  if (!b) { info.innerHTML = '<dt>Size</dt><dd>—</dd>'; return; }
+  const rows = [
+    ['Size', `${b.w.toFixed(2)} × ${b.h.toFixed(2)} mm`],
+    ['Outline', b.hasOutline ? 'From outline layer' + (b.cutouts ? ` · ${b.cutouts} cutout${b.cutouts > 1 ? 's' : ''}` : '') : 'Not found · bounding box'],
+    ['Holes', built ? `${built.cut.length + built.painted.length}` + (built.painted.length ? ` (${built.painted.length} drawn flat)` : '') : '—'],
+    ['Thickness', state.thick + ' mm'],
+  ];
+  const inner = layersOf('inner').length; if (inner) rows.push(['Inner layers', inner]);
+  info.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+}
+
+const busy = document.getElementById('busy');
+function rebuild(resetView) {
+  busy.classList.add('on');
+  setTimeout(() => {
+    try { buildBoard(); } catch (e) { console.error(e); }
+    renderFiles(); busy.classList.remove('on');
+    if (resetView && state.board) setView('iso', true);
+  }, 20);
+}
+function restyle() {
+  if (!built) return;
+  busy.classList.add('on');
+  setTimeout(() => { buildGeometry(); updateInfo(); busy.classList.remove('on'); }, 10);
+}
+
+let uid = 0;
+async function addFiles(list) {
+  try { await addFilesInner(list); } catch (err) { console.error(err); busy.classList.remove('on'); alert('Could not open files: ' + (err.message || err)); }
+}
+async function addFilesInner(list) {
+  const added = [];
+  for (const file of list) {
+    if (/\.zip$/i.test(file.name)) {
+      if (!window.JSZip) { alert('ZIP support needs an internet connection (JSZip).'); continue; }
+      const zip = await JSZip.loadAsync(file);
+      for (const entry of Object.values(zip.files)) {
+        if (entry.dir || /(^|\/)(__MACOSX|\.)/.test(entry.name)) continue;
+        if (/\.(pdf|png|jpe?g|zip|gbrjob|json|rpt|html?|md|csv|xlsx?|step|stp)$/i.test(entry.name)) continue;
+        added.push({ name: entry.name.split('/').pop(), text: await entry.async('string') });
+      }
+    } else {
+      if (file.size > 60e6) continue;
+      added.push({ name: file.name, text: await file.text() });
+    }
+  }
+  for (const a of added) {
+    if (/\u0000/.test(a.text.slice(0, 2000))) continue;
+    state.files.push({ id: ++uid, name: a.name, text: a.text, type: detectType(a.name, a.text) });
+  }
+  rebuild(true);
+}
+
+document.getElementById('fileInput').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
+document.getElementById('clearBtn').onclick = () => { state.files = []; rebuild(); };
+
+const sw = document.getElementById('maskSw');
+for (const [c, n] of MASKS) {
+  const bt = document.createElement('button'); bt.className = 'sw'; bt.style.background = c; bt.title = n; bt.setAttribute('aria-label', n + ' mask');
+  bt.setAttribute('aria-pressed', c === state.mask);
+  bt.onclick = () => { state.mask = c; sw.querySelectorAll('.sw').forEach(x => x.setAttribute('aria-pressed', x === bt)); restyle(); };
+  sw.append(bt);
+}
+document.getElementById('finish').onchange = e => { state.finish = e.target.value; restyle(); };
+document.getElementById('silkColor').onchange = e => { state.silk = e.target.value; restyle(); };
+document.getElementById('thick').onchange = e => { state.thick = parseFloat(e.target.value); restyle(); };
+for (const [id, k] of [['tMask', 'mask'], ['tSilk', 'silk'], ['tCu', 'cu'], ['tHoles', 'holes']])
+  document.getElementById(id).onchange = e => { state.show[k] = e.target.checked; restyle(); };
+
+document.querySelectorAll('[data-view]').forEach(bt => bt.onclick = () => {
+  const v = bt.dataset.view;
+  if (v === 'flip') { state.flipped = !state.flipped; const g = boardRoot.children[0]; if (g) g.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), Math.PI); return; }
+  setView(v);
+});
+document.getElementById('pngBtn').onclick = () => {
+  renderer.render(scene, camera);
+  const a = document.createElement('a'); a.download = 'pcb-3d.png'; a.href = renderer.domElement.toDataURL('image/png'); a.click();
+};
+
+// Drag & drop (works anywhere on the page)
+const drop = document.getElementById('drop');
+let hideTimer = null;
+const isFileDrag = e => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
+const showDrop = () => { clearTimeout(hideTimer); drop.classList.add('on'); };
+const hideDrop = () => { clearTimeout(hideTimer); drop.classList.remove('on'); };
+document.addEventListener('dragenter', e => { if (!isFileDrag(e)) return; e.preventDefault(); showDrop(); }, true);
+document.addEventListener('dragover', e => {
+  if (!isFileDrag(e)) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; showDrop();
+  hideTimer = setTimeout(hideDrop, 300);   // hides the overlay if the drag leaves the window
+}, true);
+document.addEventListener('dragleave', e => { if (!e.relatedTarget) { clearTimeout(hideTimer); hideTimer = setTimeout(hideDrop, 80); } }, true);
+document.addEventListener('drop', e => {
+  e.preventDefault(); e.stopPropagation(); hideDrop();
+  const dt = e.dataTransfer; if (!dt) return;
+  // Read everything synchronously: the DataTransfer is emptied once this handler returns
+  const files = [...(dt.files || [])];
+  const entries = [...(dt.items || [])].map(i => (i.kind === 'file' && i.webkitGetAsEntry) ? i.webkitGetAsEntry() : null).filter(Boolean);
+  if (entries.some(en => en.isDirectory)) {
+    const out = [];
+    const walk = ent => new Promise(res => {
+      if (ent.isFile) ent.file(f => { out.push(f); res(); }, () => res());
+      else {
+        const r = ent.createReader(), all = [];
+        const read = () => r.readEntries(async es => { if (!es.length) { for (const x of all) await walk(x); res(); } else { all.push(...es); read(); } }, () => res());
+        read();
+      }
+    });
+    Promise.all(entries.map(walk)).then(() => addFiles(out));
+  } else if (files.length) addFiles(files);
+}, true);
+
+window.__viewer = { state, setView };
+</script>
+</body>
+</html>
