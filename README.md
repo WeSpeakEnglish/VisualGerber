@@ -22,7 +22,7 @@ No installation, no build step and no server. Files are processed locally in you
 
 - **Real 3D board**: the shape comes from the outline layer, including internal cutouts and notches. Plated and non-plated holes are cut through the board, and plated holes get metal barrels.
 - **Layers rendered**: top and bottom copper, solder mask, silkscreen and outline, plus drill data. Paste and inner copper layers are recognised and listed but not drawn.
-- **Appearance**: solder mask color (green, red, blue, black, white, purple, yellow), surface finish (ENIG, HASL, bare copper), silkscreen color and board thickness (0.6 to 2.4 mm).
+- **Appearance**: solder mask color (green, red, blue, black, white, purple, yellow), surface finish (ENIG, HASL, bare copper), silkscreen color and board thickness (presets from 0.4 to 3.2 mm, or any custom value from 0.1 to 10 mm).
 - **Layer toggles**: show or hide mask, silkscreen, copper and holes.
 - **Views**: isometric, top, bottom, flip board, and export the current view as PNG.
 - **Board info**: dimensions, outline status, hole count and thickness.
@@ -37,9 +37,9 @@ No installation, no build step and no server. Files are processed locally in you
 - Linear and circular interpolation (`G01`, `G02`, `G03`), single and multi-quadrant (`G74`, `G75`)
 - Regions (`G36`/`G37`), dark and clear polarity (`LPD`/`LPC`)
 - Step-and-repeat (`SR`)
+- Block apertures (`AB`), including nested blocks and blocks flashed with clear polarity
+- Aperture transformations: mirroring (`LM`), rotation (`LR`) and scaling (`LS`), applied to flashes, draws and block apertures
 - X2 file attributes (`%TF.FileFunction`) for automatic layer detection
-
-Not supported: block apertures (`AB`), and mirroring, rotation or scaling of objects (`LM`, `LR`, `LS`).
 
 ### Excellon drill
 

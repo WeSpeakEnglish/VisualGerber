@@ -43,7 +43,8 @@ button:hover,.btn:hover{border-color:#c9ccd3}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.15)}
 .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:7px 0}
 .row label{color:var(--ink)}
-.row select{font:inherit;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:#fff}
+.row select,.row input[type=number]{font:inherit;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:#fff}
+.row input[type=number]{width:72px}
 .swatches{display:flex;gap:6px}
 .sw{width:22px;height:22px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);cursor:pointer;padding:0}
 .sw[aria-pressed=true]{box-shadow:0 0 0 2px var(--ink)}
@@ -106,7 +107,10 @@ main{flex:1;position:relative;min-width:0}
       <div class="row"><label>Silkscreen</label>
         <select id="silkColor"><option value="#f4f4f2">White</option><option value="#1b1b1b">Black</option><option value="#f1d23a">Yellow</option></select></div>
       <div class="row"><label>Thickness</label>
-        <select id="thick"><option>0.6</option><option>0.8</option><option>1.0</option><option>1.2</option><option selected>1.6</option><option>2.0</option><option>2.4</option></select></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="thickCustom" type="number" min="0.1" max="10" step="0.01" value="1.6" aria-label="Custom thickness in mm" hidden>
+          <select id="thick"><option value="0.4">0.4 mm</option><option value="0.6">0.6 mm</option><option value="0.8">0.8 mm</option><option value="1.0">1.0 mm</option><option value="1.2">1.2 mm</option><option value="1.6" selected>1.6 mm</option><option value="2.0">2.0 mm</option><option value="2.4">2.4 mm</option><option value="3.2">3.2 mm</option><option value="custom">Custom…</option></select>
+        </div></div>
       <div class="row" style="flex-wrap:wrap;justify-content:flex-start;gap:14px">
         <label class="toggle"><input type="checkbox" id="tMask" checked>Mask</label>
         <label class="toggle"><input type="checkbox" id="tSilk" checked>Silk</label>
@@ -225,9 +229,9 @@ function parseGerber(text) {
   const st = {
     xi: 3, xd: 6, yi: 3, yd: 6, zero: 'L', unit: 1, aps: {}, macros: {}, cur: null,
     x: 0, y: 0, interp: 1, quad: 'multi', region: false, contours: null, contour: null,
-    dark: true, ops: [], sr: null, attrs: {}, lastD: 1, warn: new Set()
+    dark: true, ops: [], sr: null, attrs: {}, lastD: 1, warn: new Set(),
+    lm: 'N', lr: 0, ls: 1, m: null, abStack: []
   };
-  const ops = st.ops;
 
   const num = (s, axis) => {
     if (s.includes('.')) return parseFloat(s) * st.unit;
@@ -241,10 +245,10 @@ function parseGerber(text) {
   function endSR() {
     const sr = st.sr; st.sr = null;
     if (!sr || (sr.nx <= 1 && sr.ny <= 1)) return;
-    const block = ops.slice(sr.start);
+    const block = st.ops.slice(sr.start);
     for (let ix = 0; ix < sr.nx; ix++) for (let iy = 0; iy < sr.ny; iy++) {
       if (!ix && !iy) continue;
-      for (const op of block) ops.push(shiftOp(op, ix * sr.i, iy * sr.j));
+      for (const op of block) st.ops.push(shiftOp(op, ix * sr.i, iy * sr.j));
     }
   }
 
@@ -275,10 +279,23 @@ function parseGerber(text) {
         endSR();
         const g = k => { const m = s.match(new RegExp(k + '([-\\d.]+)')); return m ? parseFloat(m[1]) : null; };
         const nx = g('X'), ny = g('Y');
-        if (nx != null || ny != null) st.sr = { nx: nx || 1, ny: ny || 1, i: (g('I') || 0) * st.unit, j: (g('J') || 0) * st.unit, start: ops.length };
+        if (nx != null || ny != null) st.sr = { nx: nx || 1, ny: ny || 1, i: (g('I') || 0) * st.unit, j: (g('J') || 0) * st.unit, start: st.ops.length };
       } else if (c === 'TF') {
         const m = s.match(/^TF\.?([^,]+),(.*)$/); if (m) st.attrs[m[1]] = m[2];
-      } else if (c === 'AB') st.warn.add('Block apertures not supported');
+      } else if (c === 'LM') { st.lm = s.slice(2) || 'N'; st.m = loadMatrix(st); }
+      else if (c === 'LR') { st.lr = parseFloat(s.slice(2)) || 0; st.m = loadMatrix(st); }
+      else if (c === 'LS') { st.ls = parseFloat(s.slice(2)) || 1; st.m = loadMatrix(st); }
+      else if (c === 'AB') {
+        const m = s.match(/^ABD(\d+)/);
+        if (m) { st.abStack.push({ code: +m[1], ops: st.ops, dark: st.dark, sr: st.sr }); st.ops = []; st.dark = true; st.sr = null; }
+        else if (st.abStack.length) {
+          endSR();
+          const f = st.abStack.pop(), b = opsBounds(st.ops);
+          const ext = isFinite(b[0]) ? 2 * Math.max(...b.map(Math.abs)) : 0;
+          st.aps[f.code] = { t: 'B', ops: st.ops, size: ext };
+          st.ops = f.ops; st.dark = f.dark; st.sr = f.sr;
+        }
+      }
     }
   }
 
@@ -316,7 +333,7 @@ function parseGerber(text) {
         else if (g === 36) { st.region = true; st.contours = []; st.contour = null; }
         else if (g === 37) {
           if (st.contour && st.contour.length > 1) st.contours.push(st.contour);
-          if (st.contours.length) ops.push({ t: 'region', contours: st.contours, dark: st.dark });
+          if (st.contours.length) st.ops.push({ t: 'region', contours: st.contours, dark: st.dark });
           st.region = false; st.contours = null; st.contour = null;
         }
         else if (g === 74) st.quad = 'single'; else if (g === 75) st.quad = 'multi';
@@ -339,13 +356,14 @@ function parseGerber(text) {
         if (st.interp === 1) st.contour.push({ t: 'L', x: nx, y: ny });
         else { const a = arcGeom(st.x, st.y, nx, ny, I, J, st.interp === 3); st.contour.push({ t: 'A', x: nx, y: ny, ...a }); }
       } else if (ap) {
-        if (st.interp === 1) ops.push({ t: 'line', ap, x1: st.x, y1: st.y, x2: nx, y2: ny, dark: st.dark });
-        else { const a = arcGeom(st.x, st.y, nx, ny, I, J, st.interp === 3); ops.push({ t: 'arc', ap, x1: st.x, y1: st.y, x2: nx, y2: ny, ...a, dark: st.dark }); }
+        if (st.interp === 1) st.ops.push({ t: 'line', ap, x1: st.x, y1: st.y, x2: nx, y2: ny, dark: st.dark, m: st.m });
+        else { const a = arcGeom(st.x, st.y, nx, ny, I, J, st.interp === 3); st.ops.push({ t: 'arc', ap, x1: st.x, y1: st.y, x2: nx, y2: ny, ...a, dark: st.dark, m: st.m }); }
       }
     } else if (D === 2) {
       if (st.region && st.contour) { if (st.contour.length > 1) st.contours.push(st.contour); st.contour = null; }
     } else if (D === 3) {
-      if (ap) ops.push({ t: 'flash', ap, x: nx, y: ny, dark: st.dark });
+      if (ap && ap.t === 'B') for (const op of ap.ops) st.ops.push(xformOp(op, nx, ny, st.m, st.dark));
+      else if (ap) st.ops.push({ t: 'flash', ap, x: nx, y: ny, dark: st.dark, m: st.m });
     }
     st.x = nx; st.y = ny;
   }
@@ -358,8 +376,45 @@ function parseGerber(text) {
     else { const j = text.indexOf('*', i); if (j < 0) break; word(text.slice(i, j).replace(/\s+/g, '')); i = j + 1; }
   }
   endSR();
-  if (st.region && st.contours) { if (st.contour && st.contour.length > 1) st.contours.push(st.contour); ops.push({ t: 'region', contours: st.contours, dark: st.dark }); }
-  return { ops, attrs: st.attrs, warnings: [...st.warn] };
+  if (st.region && st.contours) { if (st.contour && st.contour.length > 1) st.contours.push(st.contour); st.ops.push({ t: 'region', contours: st.contours, dark: st.dark }); }
+  return { ops: st.ops, attrs: st.attrs, warnings: [...st.warn] };
+}
+
+// Aperture transformation (LM/LR/LS) as a 2x2 matrix [a, b, c, d]: x' = a x + b y, y' = c x + d y.
+// Order per the Gerber spec: mirror first, then rotate and scale.
+function loadMatrix(st) {
+  const mx = st.lm.includes('X') ? -1 : 1, my = st.lm.includes('Y') ? -1 : 1;
+  const t = st.lr * Math.PI / 180, c = Math.cos(t), sn = Math.sin(t), k = st.ls;
+  if (mx === 1 && my === 1 && !st.lr && k === 1) return null;
+  return [k * c * mx, -k * sn * my, k * sn * mx, k * c * my];
+}
+const mmul = (A, B) => [A[0] * B[0] + A[1] * B[2], A[0] * B[1] + A[1] * B[3], A[2] * B[0] + A[3] * B[2], A[2] * B[1] + A[3] * B[3]];
+const mdet = m => m ? m[0] * m[3] - m[1] * m[2] : 1;
+const opScale = o => o.m ? Math.sqrt(Math.abs(mdet(o.m))) : 1;
+
+// Place an object from a block aperture: transform by M around the block origin, then move to (tx, ty).
+// A block flashed with clear polarity inverts the polarity of its contents.
+function xformOp(op, tx, ty, M, dark) {
+  const P = (x, y) => M ? [M[0] * x + M[1] * y + tx, M[2] * x + M[3] * y + ty] : [x + tx, y + ty];
+  const det = mdet(M), k = Math.sqrt(Math.abs(det)), flip = det < 0;
+  const arcX = a => {
+    const [cx, cy] = P(a.cx, a.cy), [sx, sy] = P(a.cx + a.r * Math.cos(a.a0), a.cy + a.r * Math.sin(a.a0));
+    const a0 = Math.atan2(sy - cy, sx - cx);
+    return { cx, cy, r: a.r * k, a0, a1: a0 + (a.a1 - a.a0) * (flip ? -1 : 1) };
+  };
+  const o = { ...op, dark: dark ? op.dark : !op.dark };
+  if (M) o.m = op.m ? mmul(M, op.m) : M;
+  if (o.t === 'flash') [o.x, o.y] = P(op.x, op.y);
+  else if (o.t === 'line' || o.t === 'arc') {
+    [o.x1, o.y1] = P(op.x1, op.y1); [o.x2, o.y2] = P(op.x2, op.y2);
+    if (o.t === 'arc') Object.assign(o, arcX(op));
+  } else if (o.t === 'region') {
+    o.contours = op.contours.map(c => c.map(sg => {
+      const [x, y] = P(sg.x, sg.y);
+      return sg.t === 'A' ? { ...sg, x, y, ...arcX(sg) } : { ...sg, x, y };
+    }));
+  }
+  return o;
 }
 
 function shiftOp(op, dx, dy) {
@@ -375,6 +430,7 @@ function apSize(ap) {
   if (ap.t === 'C' || ap.t === 'P') return ap.d;
   if (ap.t === 'R' || ap.t === 'O') return Math.max(ap.w, ap.h);
   if (ap.t === 'M') return Math.max(ap.bb[2] - ap.bb[0], ap.bb[3] - ap.bb[1]) * ap.u;
+  if (ap.t === 'B') return ap.size;
   return 0;
 }
 
@@ -382,9 +438,9 @@ function opsBounds(ops) {
   const b = [Infinity, Infinity, -Infinity, -Infinity];
   const add = (x, y, r = 0) => { b[0] = Math.min(b[0], x - r); b[1] = Math.min(b[1], y - r); b[2] = Math.max(b[2], x + r); b[3] = Math.max(b[3], y + r); };
   for (const o of ops) {
-    if (o.t === 'flash') add(o.x, o.y, apSize(o.ap) / 2);
-    else if (o.t === 'line') { const r = apSize(o.ap) / 2; add(o.x1, o.y1, r); add(o.x2, o.y2, r); }
-    else if (o.t === 'arc') { const pts = arcPoints(o.cx, o.cy, o.r, o.a0, o.a1); const r = apSize(o.ap) / 2; pts.forEach(p => add(p[0], p[1], r)); }
+    if (o.t === 'flash') add(o.x, o.y, apSize(o.ap) * opScale(o) / 2);
+    else if (o.t === 'line') { const r = apSize(o.ap) * opScale(o) / 2; add(o.x1, o.y1, r); add(o.x2, o.y2, r); }
+    else if (o.t === 'arc') { const pts = arcPoints(o.cx, o.cy, o.r, o.a0, o.a1); const r = apSize(o.ap) * opScale(o) / 2; pts.forEach(p => add(p[0], p[1], r)); }
     else if (o.t === 'region') o.contours.forEach(c => c.forEach(s => { if (s.t === 'A') arcPoints(s.cx, s.cy, s.r, s.a0, s.a1).forEach(p => add(p[0], p[1])); else add(s.x, s.y); }));
   }
   return b;
@@ -550,20 +606,19 @@ function primPath(ctx, p) {
   else polyPath(ctx, p.pts);
 }
 
-function drawMacroFlash(ctx, ap, x, y, view) {
+function drawMacroFlash(ctx, ap, view, m) {
   const u = ap.u;
   if (ap.simple) {
-    ctx.save(); ctx.translate(x, y); ctx.scale(u, u);
+    ctx.save(); ctx.scale(u, u);
     for (const p of ap.prims) { primPath(ctx, p); ctx.fill(); }
     ctx.restore(); return;
   }
   // Composite on an offscreen canvas so clear primitives only affect this aperture
-  const s = view.s, pad = 2;
-  const bx0 = x + ap.bb[0] * u, by1 = y + ap.bb[3] * u;
-  const w = Math.ceil((ap.bb[2] - ap.bb[0]) * u * s) + pad * 2, h = Math.ceil((ap.bb[3] - ap.bb[1]) * u * s) + pad * 2;
+  const k = view.s * u * (m ? Math.sqrt(Math.abs(mdet(m))) : 1), pad = 2, bb = ap.bb;
+  const w = Math.ceil((bb[2] - bb[0]) * k) + pad * 2, h = Math.ceil((bb[3] - bb[1]) * k) + pad * 2;
   if (w < 1 || h < 1 || w > 8192 || h > 8192) return;
   const oc = makeCanvas(w, h), o = oc.getContext('2d');
-  o.setTransform(s * u, 0, 0, -s * u, pad - ap.bb[0] * s * u, pad + ap.bb[3] * s * u);
+  o.setTransform(k, 0, 0, -k, pad - bb[0] * k, pad + bb[3] * k);
   o.fillStyle = '#fff';
   for (const p of ap.prims) {
     if (p.k === 't') {
@@ -581,8 +636,8 @@ function drawMacroFlash(ctx, ap, x, y, view) {
     o.globalCompositeOperation = p.exp ? 'source-over' : 'destination-out';
     primPath(o, p); o.fill();
   }
-  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(oc, (bx0 - view.minX) * s - pad, (view.maxY - by1) * s - pad);
+  ctx.save(); ctx.scale(u, u); ctx.translate(bb[0], bb[3]); ctx.scale(1 / k, -1 / k);
+  ctx.drawImage(oc, -pad, -pad);
   ctx.restore();
 }
 
@@ -593,21 +648,25 @@ function renderOps(ctx, ops, view) {
   for (const o of ops) {
     ctx.globalCompositeOperation = o.dark ? 'source-over' : 'destination-out';
     if (o.t === 'flash') {
-      if (o.ap.t === 'M') drawMacroFlash(ctx, o.ap, o.x, o.y, view);
-      else { const eo = apPath(ctx, o.ap, o.x, o.y); ctx.fill(eo ? 'evenodd' : 'nonzero'); }
+      ctx.save(); ctx.translate(o.x, o.y);
+      if (o.m) ctx.transform(o.m[0], o.m[2], o.m[1], o.m[3], 0, 0);
+      if (o.ap.t === 'M') drawMacroFlash(ctx, o.ap, view, o.m);
+      else { const eo = apPath(ctx, o.ap, 0, 0); ctx.fill(eo ? 'evenodd' : 'nonzero'); }
+      ctx.restore();
     } else if (o.t === 'line') {
-      const ap = o.ap;
+      const ap = o.ap, sc = opScale(o);
       if (ap.t === 'R') {
-        const hw = ap.w / 2, hh = ap.h / 2, c = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]];
+        const hw = ap.w / 2, hh = ap.h / 2, M = o.m;
+        const c = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(p => M ? [M[0] * p[0] + M[1] * p[1], M[2] * p[0] + M[3] * p[1]] : p);
         polyPath(ctx, hull(c.map(p => [p[0] + o.x1, p[1] + o.y1]).concat(c.map(p => [p[0] + o.x2, p[1] + o.y2])))); ctx.fill();
       } else {
-        const w = ap.t === 'C' ? ap.d : ap.t === 'O' ? Math.min(ap.w, ap.h) : ap.t === 'P' ? ap.d : 0.1;
+        const w = (ap.t === 'C' ? ap.d : ap.t === 'O' ? Math.min(ap.w, ap.h) : ap.t === 'P' ? ap.d : 0.1) * sc;
         if (Math.hypot(o.x2 - o.x1, o.y2 - o.y1) < 1e-9) { ctx.beginPath(); ctx.arc(o.x1, o.y1, w / 2, 0, TAU); ctx.fill(); continue; }
         ctx.lineWidth = Math.max(w, 1e-4); ctx.lineCap = 'round';
         ctx.beginPath(); ctx.moveTo(o.x1, o.y1); ctx.lineTo(o.x2, o.y2); ctx.stroke();
       }
     } else if (o.t === 'arc') {
-      const ap = o.ap, w = ap.t === 'C' ? ap.d : ap.t === 'R' || ap.t === 'O' ? Math.min(ap.w, ap.h) : 0.1;
+      const ap = o.ap, w = (ap.t === 'C' ? ap.d : ap.t === 'R' || ap.t === 'O' ? Math.min(ap.w, ap.h) : 0.1) * opScale(o);
       ctx.lineWidth = Math.max(w, 1e-4); ctx.lineCap = 'round';
       ctx.beginPath(); ctx.arc(o.cx, o.cy, o.r, o.a0, o.a1, o.a1 < o.a0); ctx.stroke();
     } else if (o.t === 'region') {
@@ -778,8 +837,8 @@ function collectHoles() {
     if (f.type === 'drill-gerber') {
       const np = /non.?plated|npth/i.test(f.parsed.attrs?.FileFunction || '') || /npth/i.test(f.name);
       for (const o of f.parsed.ops) {
-        if (o.t === 'flash' && o.dark) holes.push({ x: o.x, y: o.y, d: apSize(o.ap), plated: !np });
-        else if (o.t === 'line' && o.dark) holes.push({ x: o.x1, y: o.y1, x2: o.x2, y2: o.y2, d: apSize(o.ap), plated: !np });
+        if (o.t === 'flash' && o.dark) holes.push({ x: o.x, y: o.y, d: apSize(o.ap) * opScale(o), plated: !np });
+        else if (o.t === 'line' && o.dark) holes.push({ x: o.x1, y: o.y1, x2: o.x2, y2: o.y2, d: apSize(o.ap) * opScale(o), plated: !np });
       }
     }
   }
@@ -1089,7 +1148,20 @@ for (const [c, n] of MASKS) {
 }
 document.getElementById('finish').onchange = e => { state.finish = e.target.value; restyle(); };
 document.getElementById('silkColor').onchange = e => { state.silk = e.target.value; restyle(); };
-document.getElementById('thick').onchange = e => { state.thick = parseFloat(e.target.value); restyle(); };
+const thickSel = document.getElementById('thick'), thickIn = document.getElementById('thickCustom');
+const applyThick = v => {
+  v = parseFloat(v);
+  if (!Number.isFinite(v) || v < 0.1 || v > 10) { thickIn.style.borderColor = 'var(--err)'; return; }
+  thickIn.style.borderColor = ''; if (v === state.thick) return;
+  state.thick = Math.round(v * 1000) / 1000; restyle();
+};
+thickSel.onchange = () => {
+  if (thickSel.value === 'custom') { thickIn.hidden = false; thickIn.value = state.thick; thickIn.focus(); thickIn.select(); }
+  else { thickIn.hidden = true; applyThick(thickSel.value); }
+};
+let thickTimer = null;
+thickIn.oninput = () => { clearTimeout(thickTimer); thickTimer = setTimeout(() => applyThick(thickIn.value), 350); };
+thickIn.onchange = () => { clearTimeout(thickTimer); applyThick(thickIn.value); };
 for (const [id, k] of [['tMask', 'mask'], ['tSilk', 'silk'], ['tCu', 'cu'], ['tHoles', 'holes']])
   document.getElementById(id).onchange = e => { state.show[k] = e.target.checked; restyle(); };
 
