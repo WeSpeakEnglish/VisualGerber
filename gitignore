@@ -1,0 +1,8 @@
+# Windows "Mark of the Web" streams that appear as files when copying into WSL
+*:Zone.Identifier
+*Zone.Identifier
+
+# OS junk
+Thumbs.db
+desktop.ini
+.DS_Store
