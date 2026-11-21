@@ -6,6 +6,8 @@ and inspect the board in 3D with solder mask, surface finish, silkscreen, outlin
 
 No installation, no build step and no server. Files are processed locally in your browser and are never uploaded.
 
+**Try it now>** [LIVE](https://wespeakenglish.github.io/VisualGerber/)
+
 ## Quick start
 
 1. Open `gerber-3d-viewer.html` in Chrome, Edge or Firefox (a recent version with WebGL).
