@@ -1,7 +1,7 @@
 # Gerber 3D Viewer
 
 A single-file, browser-based 3D viewer for PCB Gerber and Excellon drill files.
-Open `gerber-3d-viewer.html` in a browser, drop in your fabrication files (loose or zipped),
+Open `index.html` in a browser, drop in your fabrication files (loose or zipped),
 and inspect the board in 3D with solder mask, surface finish, silkscreen, outline and drilled holes.
 
 No installation, no build step and no server. Files are processed locally in your browser and are never uploaded.
