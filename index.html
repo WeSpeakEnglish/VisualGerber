@@ -49,8 +49,18 @@ button:disabled{opacity:.45;cursor:default}
 .primary:hover{filter:brightness(1.08);border-color:var(--accent)}
 .small{padding:4px 8px;font-size:12px}
 #files{display:flex;flex-direction:column;gap:6px;margin-top:4px}
-.file{border:1px solid var(--line);border-radius:8px;padding:7px 8px;display:grid;
-  grid-template-columns:1fr auto auto;gap:4px 6px;align-items:center}
+.file{border:1px solid var(--line);border-radius:8px;padding:7px 6px 8px 8px;display:grid;
+  grid-template-columns:16px 16px minmax(0,1fr) auto;gap:4px 7px;align-items:center}
+.file .xbtn{grid-column:4;grid-row:1}
+.file > input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px;margin:0}
+.file.off .nm{color:var(--muted)}
+.file .r2{grid-column:3/5;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.file .r2 select{max-width:150px}
+.file .r2 input[type=range]{width:96px;flex:none;margin-right:4px}
+.file .st{grid-column:3/5}
+.blab{display:flex;align-items:center;gap:8px}
+.blab label{display:flex;align-items:center;gap:7px;cursor:pointer}
+.blab input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px;margin:0}
 .file.ignored{opacity:.75}
 .xbtn{width:24px;height:24px;padding:0;justify-content:center;border-radius:6px;background:transparent;border-color:transparent;
   color:var(--muted);font-size:16px;line-height:1}
@@ -64,7 +74,7 @@ button:disabled{opacity:.45;cursor:default}
 #toast span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #toast button{background:transparent;border:1px solid currentColor;color:inherit;padding:4px 10px;font-weight:600}
 .file .nm{font-size:12px;font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.file .st{grid-column:1/4;font-size:11px;color:var(--muted)}
+.file .st{font-size:11px;color:var(--muted)}
 .file .st.err{color:var(--err)}
 select,input[type=number]{font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:6px}
 .file select{font-size:12px;padding:3px 4px}
@@ -110,6 +120,7 @@ input[type=range]{accent-color:var(--accent);width:120px}
 .lrow input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px;margin:0}
 .lrow input[type=range]{width:96px}
 .lrow.off label{color:var(--muted)}
+#boardRow.off .blab label{color:var(--muted)}
 .info{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12px;margin:0}
 .info dt{color:var(--muted)} .info dd{margin:0;font-variant-numeric:tabular-nums}
 main{flex:1;position:relative;min-width:0}
@@ -138,6 +149,32 @@ body.mode2d .only3d{display:none}
   background:var(--glass);padding:4px 8px;border-radius:6px;display:none;border:1px solid var(--line)}
 #mlabel{position:absolute;transform:translate(-50%,-140%);background:var(--meas);color:#fff;font-size:12px;font-weight:600;
   padding:3px 8px;border-radius:6px;pointer-events:none;display:none;white-space:nowrap;font-variant-numeric:tabular-nums}
+.useg{display:flex;gap:2px;padding:2px;background:var(--chip);border:1px solid var(--line);border-radius:7px;text-transform:none;letter-spacing:0}
+.useg button{padding:2px 8px;font-size:11px;border:0;border-radius:5px;background:transparent;color:var(--muted);font-weight:600}
+.useg button[aria-checked=true]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+select.mini{font-size:11.5px;padding:2px 4px;text-transform:none;letter-spacing:0;font-weight:500}
+.fab{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.fab td{padding:4px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.fab td:first-child{width:20px}
+.fab td.v{text-align:right;white-space:nowrap;padding-left:6px}
+.fab .lim{display:block;color:var(--muted);font-size:11px}
+.fi{display:inline-flex;width:16px;height:16px;border-radius:50%;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff}
+.fi.ok{background:#2e9a5e}.fi.warn{background:#d08a10}.fi.bad{background:#d0342c}.fi.na{background:var(--line);color:var(--muted)}
+.fabnote{font-size:11px;color:var(--muted);margin:8px 0 0;line-height:1.45}
+.fabnote a{color:inherit}
+#netChip{position:absolute;left:12px;top:64px;display:flex;align-items:center;gap:8px;background:var(--glass);backdrop-filter:blur(6px);
+  border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 10px;font-size:12.5px;max-width:calc(100% - 24px);z-index:4}
+#netChip .nc-dot{width:10px;height:10px;border-radius:50%;background:#ffd54a;box-shadow:0 0 0 2px rgba(255,213,74,.35)}
+#netChip button{padding:2px 7px;background:transparent;border-color:transparent;font-size:15px;line-height:1}
+#help{position:absolute;right:12px;top:64px;width:270px;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  box-shadow:0 10px 30px rgba(0,0,0,.2);padding:12px 14px;z-index:6;font-size:12.5px}
+.help-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.help-h button{padding:2px 7px;background:transparent;border-color:transparent;font-size:15px}
+#help dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0}
+#help dt{white-space:nowrap}#help dd{margin:0}
+#help p{margin:10px 0 0;font-size:11.5px;line-height:1.45}
+kbd{display:inline-block;min-width:18px;text-align:center;padding:1px 5px;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;
+  background:var(--chip);font:600 11px/1.4 system-ui,sans-serif}
 #tip{position:absolute;pointer-events:none;display:none;background:var(--panel);color:var(--ink);border:1px solid var(--line);
   border-radius:7px;padding:5px 8px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.18);max-width:260px}
 #tip b{font-weight:650}
@@ -180,9 +217,8 @@ body.mode2d .only3d{display:none}
 
       <div class="sec sec-row"><span id="filesHead">Files</span><button class="linkbtn" id="rmIgnored" hidden></button></div>
       <div id="files"><div class="muted">No files loaded.</div></div>
+      <div id="filesFoot" class="lfoot" hidden><span class="muted" id="filesFootTxt"></span><button class="linkbtn" id="resetColors" hidden>Reset colors</button></div>
 
-      <div class="sec">Layers</div>
-      <div id="layers"><div class="muted">Load files to see layers.</div></div>
 
       <div class="sec">Appearance</div>
       <div class="row"><label for="style" id="styleLbl">Style</label>
@@ -202,8 +238,9 @@ body.mode2d .only3d{display:none}
       <div class="field" role="group" aria-labelledby="bgLbl">
         <div class="field-head"><span id="bgLbl">Background</span><span class="field-val" id="bgName"></span></div>
         <div class="swatches" id="bgSw"><label class="sw sw-custom" id="bgCustomSw" title="Custom color"><input type="color" id="bgCustom" aria-label="Custom background color"></label></div></div>
-      <div class="row"><label for="boardOp" title="Makes the FR4 see-through while copper, mask and silk stay visible">Substrate opacity</label>
-        <div class="rng"><input id="boardOp" type="range" min="10" max="100" value="100"><output id="boardOpV">100%</output></div></div>
+      <div class="row" id="boardRow"><div class="blab"><span id="boardDot"></span>
+          <label title="Show or hide the board material; the slider makes it see-through while copper, mask and silk stay visible"><input type="checkbox" id="boardOn" checked> <span id="boardName">Board material</span></label></div>
+        <div class="rng"><input id="boardOp" type="range" min="10" max="100" value="100" aria-label="Board opacity"><output id="boardOpV">100%</output></div></div>
 
       <div class="sec">View</div>
       <div class="row"><label for="explode">Explode layers</label>
@@ -224,8 +261,14 @@ body.mode2d .only3d{display:none}
         <button id="stlBtn" class="small" title="Geometry only, in mm">STL mesh</button>
       </div>
 
-      <div class="sec">Board</div>
+      <div class="sec sec-row"><span>Board</span>
+        <div class="useg" id="unitSeg" role="radiogroup" aria-label="Units">
+          <button role="radio" data-u="mm">mm</button><button role="radio" data-u="mil">mil</button><button role="radio" data-u="in">in</button></div></div>
       <dl class="info" id="info"><dt>Size</dt><dd>—</dd></dl>
+
+      <div class="sec sec-row"><span>Fab check</span>
+        <select id="fabProfile" class="mini" aria-label="Manufacturer rules"><option value="jlc">JLCPCB standard</option><option value="pcbway">PCBWay standard</option></select></div>
+      <div id="fab"><p class="muted" style="margin:0">Load a board to check it against the manufacturer's limits.</p></div>
     </div>
   </aside>
   <main>
@@ -258,8 +301,25 @@ body.mode2d .only3d{display:none}
       <button id="xrayBtn" aria-pressed="false" title="See-through board (X-ray)">X-ray</button>
       <button id="measBtn" aria-pressed="false" title="Measure distance (M)">Measure</button>
       <button id="pngBtn" title="Save image">PNG</button>
+      <button id="helpBtn" title="Keyboard shortcuts (?)" aria-expanded="false" aria-controls="help">?</button>
     </div>
     <div id="mlabel"></div>
+    <div id="netChip" hidden><span class="nc-dot"></span><span id="netChipTxt"></span><button id="netChipX" title="Clear highlight (Esc)" aria-label="Clear net highlight">×</button></div>
+    <div id="help" hidden role="dialog" aria-label="Keyboard shortcuts">
+      <div class="help-h"><b>Keyboard shortcuts</b><button id="helpX" aria-label="Close">×</button></div>
+      <dl>
+        <dt><kbd>2</kbd> <kbd>3</kbd></dt><dd>2D / 3D view</dd>
+        <dt><kbd>T</kbd> <kbd>B</kbd></dt><dd>Look at top / bottom</dd>
+        <dt><kbd>I</kbd></dt><dd>Angled 3D view</dd>
+        <dt><kbd>F</kbd></dt><dd>Flip the board (3D)</dd>
+        <dt><kbd>X</kbd></dt><dd>X-ray on/off</dd>
+        <dt><kbd>M</kbd></dt><dd>Measure on/off</dd>
+        <dt><kbd>Alt</kbd></dt><dd>Measure without snapping</dd>
+        <dt><kbd>Esc</kbd></dt><dd>Clear measurement / net highlight</dd>
+        <dt><kbd>?</kbd></dt><dd>Show this list</dd>
+      </dl>
+      <p class="muted">Mouse: click a pad or track to highlight its net (files with net names). Hover shows net, pin and part.</p>
+    </div>
     <div id="tip"></div>
     <div id="busy">Rendering…</div>
     <div id="toast" role="status" aria-live="polite"><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
@@ -358,7 +418,8 @@ function parseGerber(text) {
     xi: 3, xd: 6, yi: 3, yd: 6, zero: 'L', unit: 1, aps: {}, macros: {}, cur: null,
     x: 0, y: 0, interp: 1, quad: 'multi', region: false, contours: null, contour: null,
     dark: true, ops: [], sr: null, attrs: {}, lastD: 1, warn: new Set(),
-    lm: 'N', lr: 0, ls: 1, m: null, abStack: []
+    lm: 'N', lr: 0, ls: 1, m: null, abStack: [],
+    oa: {}   // current X2 object attributes: N = net, C = component, P = pad (refdes, pin)
   };
 
   const num = (s, axis) => {
@@ -410,6 +471,12 @@ function parseGerber(text) {
         if (nx != null || ny != null) st.sr = { nx: nx || 1, ny: ny || 1, i: (g('I') || 0) * st.unit, j: (g('J') || 0) * st.unit, start: st.ops.length };
       } else if (c === 'TF') {
         const m = s.match(/^TF\.?([^,]+),(.*)$/); if (m) st.attrs[m[1]] = m[2];
+      } else if (c === 'TO') {
+        const m = s.match(/^TO\.([A-Za-z]+),?(.*)$/);
+        if (m) { const k = m[1].toUpperCase(); if (k === 'N' || k === 'C' || k === 'P') st.oa = { ...st.oa, [k]: m[2] }; }
+      } else if (c === 'TD') {
+        const k = s.slice(2).replace(/^\./, '').toUpperCase();
+        if (!k) st.oa = {}; else if (st.oa[k] != null) { const o = { ...st.oa }; delete o[k]; st.oa = o; }
       } else if (c === 'LM') { st.lm = s.slice(2) || 'N'; st.m = loadMatrix(st); }
       else if (c === 'LR') { st.lr = parseFloat(s.slice(2)) || 0; st.m = loadMatrix(st); }
       else if (c === 'LS') { st.ls = parseFloat(s.slice(2)) || 1; st.m = loadMatrix(st); }
@@ -461,7 +528,7 @@ function parseGerber(text) {
         else if (g === 36) { st.region = true; st.contours = []; st.contour = null; }
         else if (g === 37) {
           if (st.contour && st.contour.length > 1) st.contours.push(st.contour);
-          if (st.contours.length) st.ops.push({ t: 'region', contours: st.contours, dark: st.dark });
+          if (st.contours.length) st.ops.push({ t: 'region', contours: st.contours, dark: st.dark, oa: st.oa });
           st.region = false; st.contours = null; st.contour = null;
         }
         else if (g === 74) st.quad = 'single'; else if (g === 75) st.quad = 'multi';
@@ -484,14 +551,14 @@ function parseGerber(text) {
         if (st.interp === 1) st.contour.push({ t: 'L', x: nx, y: ny });
         else { const a = arcGeom(st.x, st.y, nx, ny, I, J, st.interp === 3); st.contour.push({ t: 'A', x: nx, y: ny, ...a }); }
       } else if (ap) {
-        if (st.interp === 1) st.ops.push({ t: 'line', ap, x1: st.x, y1: st.y, x2: nx, y2: ny, dark: st.dark, m: st.m });
-        else { const a = arcGeom(st.x, st.y, nx, ny, I, J, st.interp === 3); st.ops.push({ t: 'arc', ap, x1: st.x, y1: st.y, x2: nx, y2: ny, ...a, dark: st.dark, m: st.m }); }
+        if (st.interp === 1) st.ops.push({ t: 'line', ap, x1: st.x, y1: st.y, x2: nx, y2: ny, dark: st.dark, m: st.m, oa: st.oa });
+        else { const a = arcGeom(st.x, st.y, nx, ny, I, J, st.interp === 3); st.ops.push({ t: 'arc', ap, x1: st.x, y1: st.y, x2: nx, y2: ny, ...a, dark: st.dark, m: st.m, oa: st.oa }); }
       }
     } else if (D === 2) {
       if (st.region && st.contour) { if (st.contour.length > 1) st.contours.push(st.contour); st.contour = null; }
     } else if (D === 3) {
       if (ap && ap.t === 'B') for (const op of ap.ops) st.ops.push(xformOp(op, nx, ny, st.m, st.dark));
-      else if (ap) st.ops.push({ t: 'flash', ap, x: nx, y: ny, dark: st.dark, m: st.m });
+      else if (ap) st.ops.push({ t: 'flash', ap, x: nx, y: ny, dark: st.dark, m: st.m, oa: st.oa });
     }
     st.x = nx; st.y = ny;
   }
@@ -1054,6 +1121,7 @@ const state = {
   layers: {}, boardOpacity: 1, style3D: 'real', style2D: 'layers', colors: {}, rcolors: {}, explode: 0, section: { axis: 'off', pos: 0.5 },
   board: null, flipped: false, is2D: true, theme: 'auto', bg: 'theme',
   meas: { on: false, pts: [], hover: null },
+  units: 'mm', fab: 'jlc', net: null,
 };
 const L = k => state.layers[k] || (state.layers[k] = DEF_LAYER(k));
 const MASKS = [['#1d5a2c', 'Green'], ['#8f1f1f', 'Red'], ['#1d3f8f', 'Blue'], ['#151515', 'Black'], ['#efefef', 'White'], ['#4b2a73', 'Purple'], ['#d7b81c', 'Yellow']];
@@ -1081,7 +1149,7 @@ const STORE = 'gerber3d.settings.v2';
 function loadSettings() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE) || 'null'); if (!s) return;
-    for (const k of ['mask', 'finish', 'silk', 'thick', 'boardOpacity', 'style3D', 'style2D', 'theme', 'bg', 'is2D']) if (s[k] != null) state[k] = s[k];
+    for (const k of ['mask', 'finish', 'silk', 'thick', 'boardOpacity', 'style3D', 'style2D', 'theme', 'bg', 'is2D', 'units', 'fab']) if (s[k] != null) state[k] = s[k];
     if (s.style && !s.style3D) state.style3D = s.style;
     if (s.colors && typeof s.colors === 'object') state.colors = s.colors;
     if (s.rcolors && typeof s.rcolors === 'object') state.rcolors = s.rcolors;
@@ -1091,7 +1159,7 @@ function loadSettings() {
 function saveSettings() {
   try {
     localStorage.setItem(STORE, JSON.stringify({ mask: state.mask, finish: state.finish, silk: state.silk, thick: state.thick,
-      boardOpacity: state.boardOpacity, style3D: state.style3D, style2D: state.style2D, colors: state.colors, rcolors: state.rcolors, is2D: state.is2D, theme: state.theme, bg: state.bg, layers: state.layers }));
+      boardOpacity: state.boardOpacity, style3D: state.style3D, style2D: state.style2D, colors: state.colors, rcolors: state.rcolors, is2D: state.is2D, units: state.units, fab: state.fab, theme: state.theme, bg: state.bg, layers: state.layers }));
   } catch { /* storage unavailable */ }
 }
 loadSettings();
@@ -1213,7 +1281,7 @@ function set2D(on, init) {
 }
 
 /* ---------- Build board ---------- */
-function layersOf(type) { return state.files.filter(f => f.type === type && f.parsed && !f.err); }
+function layersOf(type) { return state.files.filter(f => f.type === type && f.parsed && !f.err && !f.hidden); }
 function opsOf(type) { return layersOf(type).flatMap(f => f.parsed.ops || []); }
 
 function parseFile(f) {
@@ -1229,7 +1297,7 @@ function parseFile(f) {
 function collectHoles() {
   const holes = [];
   for (const f of state.files) {
-    if (!f.parsed || f.err) continue;
+    if (!f.parsed || f.err || f.hidden) continue;
     if (f.type === 'drill' || f.type === 'drill-npth') for (const h of f.parsed.holes) holes.push({ ...h, plated: f.type === 'drill' ? h.plated : false });
     if (f.type === 'drill-gerber') {
       const np = /non.?plated|npth/i.test(f.parsed.attrs?.FileFunction || '') || /npth/i.test(f.name);
@@ -1329,7 +1397,7 @@ function buildBoard() {
   state.meas.pts = []; state.meas.hover = null;
   const hasAny = state.files.some(f => f.parsed && f.type !== 'ignore');
   document.getElementById('empty').style.display = hasAny ? 'none' : 'flex';
-  if (!hasAny) { state.board = null; built = null; updateInfo(); renderLayers(); renderMeasureInfo([]); return; }
+  if (!hasAny) { state.board = null; built = null; state.net = null; updateInfo(); renderLayers(); renderMeasureInfo([]); renderFab(); renderNetChip(); return; }
 
   // ---- outline
   let outer = null, cutouts = [], outlineFrom = '', ignoredShapes = 0;
@@ -1368,7 +1436,7 @@ function buildBoard() {
       const ob = opsBounds(opsOf(t)); b = [Math.min(b[0], ob[0]), Math.min(b[1], ob[1]), Math.max(b[2], ob[2]), Math.max(b[3], ob[3])];
     }
     for (const h of collectHoles()) { b[0] = Math.min(b[0], h.x - h.d); b[1] = Math.min(b[1], h.y - h.d); b[2] = Math.max(b[2], h.x + h.d); b[3] = Math.max(b[3], h.y + h.d); }
-    if (!isFinite(b[0])) { state.board = null; built = null; updateInfo(); renderLayers(); return; }
+    if (!isFinite(b[0])) { state.board = null; built = null; state.net = null; updateInfo(); renderLayers(); renderFab(); renderNetChip(); return; }
     b = [b[0] - 1, b[1] - 1, b[2] + 1, b[3] + 1];
     outer = [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]];
   }
@@ -1420,9 +1488,11 @@ function buildBoard() {
   for (const c of comps) addS(c.x, c.y);
 
   built = { view, raster: {}, inners, outer, cutouts, cut, painted, holes, comps, snap, cx, cy, b, W, H, disp: [] };
+  buildNetIndex();
   buildGeometry();
   updateInfo();
   renderLayers();
+  renderFab(); renderNetChip();
 }
 
 function paintHoles(ctx, color) {
@@ -1668,6 +1738,7 @@ function buildGeometry() {
 
   addComponents(g);
   makeMeasureHelpers(g);
+  addNetOverlay(g);
   g.rotation.x = -Math.PI / 2;
   if (state.flipped) g.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), Math.PI);
   boardRoot.add(g);
@@ -1690,6 +1761,7 @@ function layoutStack(g) {
     g.userData.surf = { top: total / 2, bot: -total / 2 };
   }
   for (const im of g.userData.compMeshes.concat(g.userData.compLines || [])) im.position.z = im.userData.side === 'b' ? g.userData.surf.bot : g.userData.surf.top;
+  for (const m of g.userData.netOv || []) m.position.z = m.userData.side === 'top' ? g.userData.surf.top + 0.06 : g.userData.surf.bot - 0.06;
   updateMeasureHelpers();
 }
 
@@ -1828,11 +1900,11 @@ function renderMeasureInfo(pts) {
   const [p, q] = pts, dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy);
   const ang = Math.atan2(dy, dx) * 180 / Math.PI;
   el.innerHTML = [
-    ['Distance', `<b>${fmt(d)} mm</b> · ${(d / 0.0254).toFixed(1)} mil`],
-    ['ΔX / ΔY', `${fmt(dx)} / ${fmt(dy)} mm`],
+    ['Distance', `<b>${fmtL(d)}</b>`],
+    ['ΔX / ΔY', `${fmtL(dx, false)} / ${fmtL(dy)}`],
     ['Angle', `${ang.toFixed(2)}°`],
-    ['A', `${fmt(p.x + built.cx)}, ${fmt(p.y + built.cy)}${p.snapped ? ' · snapped' : ''}`],
-    ['B', `${fmt(q.x + built.cx)}, ${fmt(q.y + built.cy)}${q.snapped ? ' · snapped' : ''}`],
+    ['A', `${fmtL(p.x + built.cx, false)}, ${fmtL(p.y + built.cy, false)}${p.snapped ? ' · snapped' : ''}`],
+    ['B', `${fmtL(q.x + built.cx, false)}, ${fmtL(q.y + built.cy, false)}${q.snapped ? ' · snapped' : ''}`],
   ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
 }
 // Size in mm that one screen pixel covers at a world point, for the active camera
@@ -1851,7 +1923,7 @@ function placeMeasureLabel(g) {
   g.localToWorld(tmpV); tmpV.project(cam);
   if (tmpV.z > 1) { mlabel.style.display = 'none'; return; }
   const pts = measurePts(), d = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
-  mlabel.textContent = d.toFixed(3) + ' mm';
+  mlabel.textContent = fmtL(d);
   mlabel.style.left = ((tmpV.x + 1) / 2 * viewEl.clientWidth) + 'px';
   mlabel.style.top = ((1 - tmpV.y) / 2 * viewEl.clientHeight) + 'px';
   mlabel.style.display = 'block';
@@ -1878,6 +1950,7 @@ function boardHit(e) {
   const p = g.worldToLocal(hits[0].point.clone());
   let pt = { x: p.x, y: p.y, side: p.z >= 0 ? 'top' : 'bot', snapped: false };
   if (!e.altKey) { const s = snapPt(p.x + built.cx, p.y + built.cy); if (s) pt = { x: s[0] - built.cx, y: s[1] - built.cy, side: pt.side, snapped: true }; }
+  pt.rx = p.x + built.cx; pt.ry = p.y + built.cy;   // exact board point under the cursor
   return pt;
 }
 function setMeasure(on) {
@@ -1895,7 +1968,13 @@ renderer.domElement.addEventListener('pointerdown', e => { downAt = { x: e.clien
 renderer.domElement.addEventListener('pointerup', e => {
   if (!downAt) return;
   const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y); downAt = null;
-  if (moved > 5 || e.button !== 0 || !state.meas.on) return;
+  if (moved > 5 || e.button !== 0) return;
+  if (!state.meas.on) {
+    if (!built?.hasNets) return;
+    const p = boardHit(e), hit = p && netAt(p.rx, p.ry, p.side);
+    setNet(hit?.o.oa?.N || null);
+    return;
+  }
   const p = boardHit(e); if (!p) return;
   if (state.meas.pts.length >= 2) state.meas.pts = [];
   state.meas.pts.push(p); state.meas.hover = null;
@@ -1910,120 +1989,457 @@ renderer.domElement.addEventListener('pointerleave', () => { coordsEl.style.disp
 function hover(e) {
   const g = board(); if (!g || !built) return;
   const p = boardHit(e);
-  if (p) { coordsEl.style.display = 'block'; coordsEl.textContent = `X ${fmt(p.x + built.cx)}   Y ${fmt(p.y + built.cy)} mm${p.snapped ? ' · snap' : ''}`; }
+  if (p) { coordsEl.style.display = 'block'; coordsEl.textContent = `X ${fmtL(p.x + built.cx, false)}   Y ${fmtL(p.y + built.cy)}${p.snapped ? ' · snap' : ''}`; }
   else coordsEl.style.display = 'none';
   if (state.meas.on && state.meas.pts.length === 1) { state.meas.hover = p; updateMeasureHelpers(); }
+  const esc = s => String(s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+  const lines = [];
+  // copper under the cursor: net, pad (part and pin) and layer, from the Gerber X2 attributes
+  const nh = !state.meas.on && p && built.hasNets ? netAt(p.rx, p.ry, p.side) : null;
+  if (nh) {
+    const a = nh.o.oa || {}, pad = a.P ? a.P.split(',') : null;
+    lines.push(`<b>${a.N ? esc(a.N) : 'No net'}</b>` + (pad ? ` · ${esc(pad[0])} pin ${esc(pad[1] || '?')}` : '')
+      + `<br><span class="muted">${esc(nh.L.label)} · ${nh.o.t === 'flash' ? 'pad' : nh.o.t === 'region' ? 'copper area' : 'track'}${a.N ? ' · click to highlight' : ''}</span>`);
+  }
   const ch = g.userData.compMeshes.length && !state.meas.on ? pickAt(e, g.userData.compMeshes) : [];
   if (ch.length && ch[0].instanceId != null) {
-    const c = ch[0].object.userData.comps[ch[0].instanceId], r = viewEl.getBoundingClientRect();
-    const esc = s => String(s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
-    tipEl.innerHTML = `<b>${esc(c.ref || '?')}</b>${c.val ? ' · ' + esc(c.val) : ''}<br><span class="muted">${esc(c.pkg || 'unknown package')} · ${c.bottom ? 'bottom' : 'top'} · ${c.rot}°</span>`;
+    const c = ch[0].object.userData.comps[ch[0].instanceId];
+    lines.push(`<b>${esc(c.ref || '?')}</b>${c.val ? ' · ' + esc(c.val) : ''}<br><span class="muted">${esc(c.pkg || 'unknown package')} · ${c.bottom ? 'bottom' : 'top'} · ${c.rot}°</span>`);
+  }
+  if (lines.length) {
+    const r = viewEl.getBoundingClientRect();
+    tipEl.innerHTML = lines.join('<hr style="border:0;border-top:1px solid var(--line);margin:5px 0">');
     tipEl.style.left = Math.min(e.clientX - r.left + 14, r.width - 270) + 'px'; tipEl.style.top = (e.clientY - r.top + 14) + 'px';
     tipEl.style.display = 'block';
   } else tipEl.style.display = 'none';
 }
 
+/* =====================================================================
+   Units
+   ===================================================================== */
+const UNIT = { mm: [1, 'mm'], mil: [0.0254, 'mil'], in: [25.4, 'in'] };
+function fmtL(mm, withUnit = true) {
+  const [k, u] = UNIT[state.units] || UNIT.mm, v = mm / k;
+  const txt = state.units === 'in' ? v.toFixed(4) : state.units === 'mil' ? v.toFixed(Math.abs(v) < 1000 ? 1 : 0) : v.toFixed(Math.abs(v) < 100 ? 3 : 2);
+  return withUnit ? txt + ' ' + u : txt;
+}
+function syncUnits() { document.querySelectorAll('#unitSeg [data-u]').forEach(b => b.setAttribute('aria-checked', b.dataset.u === state.units)); }
+document.querySelectorAll('#unitSeg [data-u]').forEach(b => b.onclick = () => {
+  state.units = b.dataset.u; syncUnits(); saveSettings();
+  updateInfo(); renderFab(); updateMeasureHelpers(); renderNetChip();
+});
+syncUnits();
+
+/* =====================================================================
+   Nets: Gerber X2 object attributes (%TO.N net, %TO.P pad, %TO.C part)
+   ===================================================================== */
+const NET_COL = '#ffd54a', NG = 1.5;   // highlight colour, index cell size (mm)
+function traceWidth(o) {
+  const ap = o.ap; if (!ap) return 0;
+  const w = ap.t === 'C' || ap.t === 'P' ? ap.d : ap.t === 'R' || ap.t === 'O' ? Math.min(ap.w, ap.h) : apSize(ap);
+  return w * opScale(o);
+}
+function opBox(o) {
+  if (o.t === 'flash') { const r = apSize(o.ap) * opScale(o) / 2; return [o.x - r, o.y - r, o.x + r, o.y + r]; }
+  if (o.t === 'line') { const r = traceWidth(o) / 2; return [Math.min(o.x1, o.x2) - r, Math.min(o.y1, o.y2) - r, Math.max(o.x1, o.x2) + r, Math.max(o.y1, o.y2) + r]; }
+  if (o.t === 'arc') { const r = o.r + traceWidth(o) / 2; return [o.cx - r, o.cy - r, o.cx + r, o.cy + r]; }
+  if (o.t === 'region') {
+    const b = [Infinity, Infinity, -Infinity, -Infinity];
+    o._poly = o.contours.map(c => { const pts = []; for (const sg of c) { if (sg.t === 'A') pts.push(...arcPoints(sg.cx, sg.cy, sg.r, sg.a0, sg.a1, 0.3).slice(1)); else pts.push([sg.x, sg.y]); } return pts; });
+    for (const pl of o._poly) for (const [x, y] of pl) { b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y); }
+    return isFinite(b[0]) ? b : null;
+  }
+  return null;
+}
+function segDist(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1, L2 = dx * dx + dy * dy;
+  const t = L2 ? Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / L2)) : 0;
+  return Math.hypot(px - x1 - t * dx, py - y1 - t * dy);
+}
+// Is board point (x, y) covered by this drawing object?
+function hitOp(o, x, y) {
+  if (o.t === 'flash') {
+    let dx = x - o.x, dy = y - o.y;
+    if (o.m) { const d = mdet(o.m) || 1; [dx, dy] = [(o.m[3] * dx - o.m[1] * dy) / d, (-o.m[2] * dx + o.m[0] * dy) / d]; }
+    const ap = o.ap;
+    if (ap.t === 'C') return dx * dx + dy * dy <= ap.d * ap.d / 4;
+    if (ap.t === 'R') return Math.abs(dx) <= ap.w / 2 && Math.abs(dy) <= ap.h / 2;
+    if (ap.t === 'O') { const r = Math.min(ap.w, ap.h) / 2, ex = ap.w / 2 - r, ey = ap.h / 2 - r; return Math.hypot(dx - Math.max(-ex, Math.min(ex, dx)), dy - Math.max(-ey, Math.min(ey, dy))) <= r; }
+    if (ap.t === 'P') return Math.hypot(dx, dy) <= ap.d / 2;
+    if (ap.t === 'M') {
+      const px = dx / ap.u, py = dy / ap.u; let inside = false;
+      for (const pr of ap.prims) {
+        let h = false;
+        if (pr.k === 'c') h = Math.hypot(px - pr.x, py - pr.y) <= pr.r;
+        else if (pr.k === 'p') h = pip([px, py], pr.pts);
+        else { const [cx, cy] = rot2(pr.cx, pr.cy, pr.rot), d = Math.hypot(px - cx, py - cy); h = d <= pr.od / 2 && d >= pr.id / 2; }
+        if (h) inside = !!pr.exp;
+      }
+      return inside;
+    }
+    return Math.hypot(dx, dy) <= apSize(ap) / 2;
+  }
+  if (o.t === 'line') return segDist(x, y, o.x1, o.y1, o.x2, o.y2) <= traceWidth(o) / 2;
+  if (o.t === 'arc') {
+    if (Math.abs(Math.hypot(x - o.cx, y - o.cy) - o.r) > traceWidth(o) / 2) return Math.hypot(x - o.x1, y - o.y1) <= traceWidth(o) / 2 || Math.hypot(x - o.x2, y - o.y2) <= traceWidth(o) / 2;
+    const sw = o.a1 - o.a0; let t = Math.atan2(y - o.cy, x - o.cx) - o.a0;
+    if (sw >= 0) { while (t < 0) t += TAU; while (t > TAU) t -= TAU; return t <= sw; }
+    while (t > 0) t -= TAU; while (t < -TAU) t += TAU; return t >= sw;
+  }
+  if (o.t === 'region') { let ins = false; for (const pl of o._poly || []) if (pip([x, y], pl)) ins = !ins; return ins; }
+  return false;
+}
+function buildNetIndex() {
+  const layers = [];
+  for (const t of ['top-copper', 'bottom-copper']) for (const f of layersOf(t)) layers.push({ type: t, label: TYPES[t].label, f });
+  built.inners.forEach((r, i) => layers.push({ type: 'inner', label: 'Inner ' + (i + 1), f: r.f }));
+  const nets = new Map(); let any = false;
+  for (const Lr of layers) {
+    const grid = new Map(), ops = Lr.f.parsed.ops;
+    ops.forEach((o, idx) => {
+      const n = o.oa?.N; if (n != null) any = true;
+      const bb = opBox(o); if (!bb) return;
+      const x0 = Math.floor(bb[0] / NG), x1 = Math.floor(bb[2] / NG), y0 = Math.floor(bb[1] / NG), y1 = Math.floor(bb[3] / NG);
+      if ((x1 - x0 + 1) * (y1 - y0 + 1) > 60000) return;
+      for (let i = x0; i <= x1; i++) for (let j = y0; j <= y1; j++) { const k = i + ',' + j; (grid.get(k) || grid.set(k, []).get(k)).push(idx); }
+      if (n && o.dark) (nets.get(n) || nets.set(n, []).get(n)).push({ L: Lr, o });
+    });
+    Lr.grid = grid;
+  }
+  built.netLayers = layers; built.nets = nets; built.hasNets = any && nets.size > 0;
+  if (state.net && !nets.has(state.net)) state.net = null;
+}
+// Topmost copper object under a board point, as seen from the given side
+function netAt(x, y, side) {
+  if (!built?.hasNets) return null;
+  let order = built.netLayers.filter(Lr => L(Lr.type).on);
+  order = order.slice().sort((a, b) => rank(a) - rank(b));
+  function rank(Lr) { const r = Lr.type === 'top-copper' ? 0 : Lr.type === 'inner' ? 1 : 2; return side === 'bot' ? 2 - r : r; }
+  const key = Math.floor(x / NG) + ',' + Math.floor(y / NG);
+  for (const Lr of order) {
+    const idx = Lr.grid.get(key); if (!idx) continue;
+    const ops = Lr.f.parsed.ops; let hit = null, pad = null;
+    for (const i of idx) if (hitOp(ops[i], x, y)) {
+      hit = ops[i].dark ? ops[i] : null;                 // later clear objects cut earlier ones
+      if (!hit) pad = null; else if (hit.t === 'flash') pad = hit;
+    }
+    if (hit) return { L: Lr, o: pad && pad.oa?.N === hit.oa?.N ? pad : hit };   // a pad says more than the track on top of it
+  }
+  return null;
+}
+function netStats(n) {
+  const items = built.nets.get(n) || [], layers = new Set(), pads = new Set(); let len = 0;
+  for (const { L: Lr, o } of items) {
+    layers.add(Lr);
+    if (o.oa?.P) pads.add(o.oa.P);
+    if (o.t === 'line') len += Math.hypot(o.x2 - o.x1, o.y2 - o.y1);
+    else if (o.t === 'arc') len += Math.abs(o.a1 - o.a0) * o.r;
+  }
+  return { layers: layers.size, pads: pads.size, len };
+}
+function addNetOverlay(g) {
+  g.userData.netOv = [];
+  if (!state.net || !built?.nets?.has(state.net)) return;
+  const v = built.view, k = Math.min(1, 2048 / Math.max(v.W, v.H));
+  const W = Math.max(4, Math.round(v.W * k)), H = Math.max(4, Math.round(v.H * k)), sv = { minX: v.minX, maxY: v.maxY, s: v.s * k };
+  const byLayer = new Map();
+  for (const it of built.nets.get(state.net)) (byLayer.get(it.L) || byLayer.set(it.L, []).get(it.L)).push(it.o);
+  const tmp = makeCanvas(W, H), tint = makeCanvas(W, H);
+  for (const side of ['top', 'bottom']) {
+    const c = makeCanvas(W, H), x = c.getContext('2d');
+    x.fillStyle = 'rgba(0,0,0,0.42)'; x.fillRect(0, 0, W, H);          // dim everything else
+    const layers = [...byLayer.keys()].sort((a, b) => (a.type === side + '-copper') - (b.type === side + '-copper'));
+    for (const Lr of layers) {
+      const tx = tmp.getContext('2d'); tx.setTransform(1, 0, 0, 1, 0, 0); tx.clearRect(0, 0, W, H);
+      renderOps(tx, byLayer.get(Lr), sv); tx.setTransform(1, 0, 0, 1, 0, 0);
+      x.globalCompositeOperation = 'destination-out'; put(x, tmp, 1); x.globalCompositeOperation = 'source-over';
+      put(x, tinted(tmp, NET_COL, tint), Lr.type === side + '-copper' ? 1 : 0.45);   // this side bright, others fainter
+    }
+    const tex = texture(c, true);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false, side: side === 'top' ? THREE.FrontSide : THREE.BackSide });
+    clip(mat); built.disp.push(tex, mat);
+    const m = new THREE.Mesh(sheetGeo(L('holes').on), mat); m.renderOrder = 1e8; m.frustumCulled = false;
+    Object.assign(m.userData, { helper: true, side });
+    g.add(m); g.userData.netOv.push(m);
+  }
+}
+function setNet(n) {
+  state.net = n || null;
+  const g = board();
+  if (g) { for (const m of g.userData.netOv || []) { g.remove(m); m.material.map?.dispose(); m.material.dispose(); } addNetOverlay(g); layoutStack(g); }
+  renderNetChip();
+}
+function renderNetChip() {
+  const chip = document.getElementById('netChip');
+  if (!state.net || !built?.nets?.has(state.net)) { chip.hidden = true; return; }
+  const st = netStats(state.net), esc = t => String(t).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+  document.getElementById('netChipTxt').innerHTML = `<b>${esc(state.net)}</b> · ${st.layers} layer${st.layers === 1 ? '' : 's'} · ${st.pads} pad${st.pads === 1 ? '' : 's'}`
+    + (st.len > 0 ? ` · ${fmtL(st.len)} of track` : '');
+  chip.hidden = false;
+}
+document.getElementById('netChipX').onclick = () => setNet(null);
+
+/* =====================================================================
+   Fab check: measured from the Gerbers, compared with published limits
+   Limits from jlcpcb.com/capabilities/pcb-capabilities and pcbway.com/capabilities.html (checked Nov 2026)
+   ===================================================================== */
+const FAB = {
+  jlc: {
+    name: 'JLCPCB', url: 'https://jlcpcb.com/capabilities/pcb-capabilities',
+    board: { min: 3, max: n => n <= 1 ? [606, 510] : n <= 2 ? [670, 600] : n <= 4 ? [663, 593] : [656, 586] },
+    trace: n => n <= 2 ? 0.10 : 0.09,
+    drill: { min: 0.15, rec: 0.2, max: 6.3 }, npth: 0.5,
+    viaRing: { min: 0.05, rec: 0.075 }, padRing: n => n <= 2 ? { min: 0.18, rec: 0.25 } : { min: 0.15, rec: 0.2 },
+    edge: 0.2, holeGap: { via: 0.2, pad: 0.45 }, silk: 0.15,
+  },
+  pcbway: {
+    name: 'PCBWay', url: 'https://www.pcbway.com/capabilities.html',
+    board: { min: 3, max: n => n <= 2 ? [1200, 600] : [1150, 560] },
+    trace: () => 0.10,
+    drill: { min: 0.15, rec: 0.2, max: 6.0 }, npth: null,
+    viaRing: { min: 0.15, rec: 0.15 }, padRing: () => ({ min: 0.15, rec: 0.15 }),
+    edge: null, holeGap: null, silk: 0.15,
+  },
+};
+// Smallest distance from the flash centre to the pad's edge (for annular ring)
+function padInRadius(o) {
+  const ap = o.ap, k = opScale(o);
+  if (ap.t === 'C') return ap.d / 2 * k;
+  if (ap.t === 'R' || ap.t === 'O') return Math.min(ap.w, ap.h) / 2 * k;
+  if (ap.t === 'P') return ap.d / 2 * Math.cos(Math.PI / Math.max(3, ap.n)) * k;
+  if (ap.t === 'M') {
+    let r = 0;
+    for (const pr of ap.prims) {
+      if (!pr.exp) continue;
+      if (pr.k === 'c' && Math.hypot(pr.x, pr.y) < pr.r) r = Math.max(r, pr.r - Math.hypot(pr.x, pr.y));
+      if (pr.k === 'p' && pip([0, 0], pr.pts)) r = Math.max(r, distToPoly([0, 0], pr.pts));
+    }
+    return r * ap.u * k;
+  }
+  return apSize(ap) / 2 * k;
+}
+function fabStats() {
+  if (built.fab) return built.fab;
+  const { outer, cutouts, holes, b } = built, polys = [outer, ...cutouts];
+  const cutBoxes = cutouts.map(polyBounds);
+  const onBoard = (x, y) => pip([x, y], outer) && !cutouts.some(c => pip([x, y], c));
+  // distance to the nearest board edge, skipping points clearly far from every edge
+  const edgeDist = (x, y, near = 3) => {
+    const far = Math.min(x - b[0], b[2] - x, y - b[1], b[3] - y) > near && !cutBoxes.some(c => x > c[0] - near && x < c[2] + near && y > c[1] - near && y < c[3] + near);
+    return far ? Infinity : Math.min(...polys.map(p => distToPoly([x, y], p)));
+  };
+  const copperLayers = ['top-copper', 'bottom-copper'].filter(t => opsOf(t).length).length + built.inners.length;
+  let minTrace = Infinity, edge = Infinity, edgeAt = null;
+  const copperOps = ['top-copper', 'bottom-copper', 'inner'].flatMap(t => opsOf(t));
+  for (const o of copperOps) {
+    if (!o.dark) continue;
+    if (o.t === 'line' || o.t === 'arc') {
+      const w = traceWidth(o);
+      if (w > 0.01 && (onBoard(o.x1, o.y1) || onBoard(o.x2, o.y2)) && w < minTrace) minTrace = w;
+    }
+    const pts = o.t === 'flash' ? [[o.x, o.y, apSize(o.ap) * opScale(o) / 2]]
+      : o.t === 'line' ? [[o.x1, o.y1, traceWidth(o) / 2], [o.x2, o.y2, traceWidth(o) / 2], [(o.x1 + o.x2) / 2, (o.y1 + o.y2) / 2, traceWidth(o) / 2]]
+      : o.t === 'arc' ? [[o.x1, o.y1, traceWidth(o) / 2], [o.x2, o.y2, traceWidth(o) / 2]]
+      : o.t === 'region' ? (opBox(o), o._poly.flat().map(([x, y]) => [x, y, 0])) : [];
+    for (const [x, y, r] of pts) {
+      if (!onBoard(x, y)) continue;
+      const d = edgeDist(x, y, 3 + r) - r;
+      if (d < edge) { edge = d; edgeAt = [x, y]; }
+    }
+  }
+  // drills
+  const round = holes.filter(h => h.x2 == null);
+  const pth = round.filter(h => h.plated), npth = round.filter(h => !h.plated);
+  const minOf = (a, f) => a.length ? Math.min(...a.map(f)) : null;
+  // annular rings: pads centred on plated holes, on the outer copper layers
+  const flashGrid = new Map();
+  for (const t of ['top-copper', 'bottom-copper']) for (const o of opsOf(t)) if (o.t === 'flash' && o.dark) {
+    const k = Math.round(o.x / 0.5) + ',' + Math.round(o.y / 0.5); (flashGrid.get(k) || flashGrid.set(k, []).get(k)).push(o);
+  }
+  let viaRing = Infinity, padRing = Infinity, noPad = 0;
+  for (const h of pth) {
+    let best = null;
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const o of flashGrid.get((Math.round(h.x / 0.5) + i) + ',' + (Math.round(h.y / 0.5) + j)) || [])
+      if (Math.hypot(o.x - h.x, o.y - h.y) < 0.02) { const r = padInRadius(o) - h.d / 2; best = best == null ? r : Math.min(best, r); }
+    if (best == null) { noPad++; continue; }
+    if (h.d <= 0.45) viaRing = Math.min(viaRing, best); else padRing = Math.min(padRing, best);
+  }
+  // hole to edge, hole to hole
+  let holeEdge = Infinity, gapVia = Infinity, gapPad = Infinity;
+  for (const h of holes) {
+    const ends = h.x2 != null ? [[h.x, h.y], [h.x2, h.y2]] : [[h.x, h.y]];
+    for (const [x, y] of ends) holeEdge = Math.min(holeEdge, edgeDist(x, y, 3 + h.d) - h.d / 2);
+  }
+  const hg = new Map();
+  for (const h of round) { const k = Math.floor(h.x / 2) + ',' + Math.floor(h.y / 2); (hg.get(k) || hg.set(k, []).get(k)).push(h); }
+  for (const h of round) {
+    const gx = Math.floor(h.x / 2), gy = Math.floor(h.y / 2);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const o of hg.get((gx + i) + ',' + (gy + j)) || []) {
+      if (o === h) continue;
+      const gap = Math.hypot(o.x - h.x, o.y - h.y) - (o.d + h.d) / 2;
+      if (gap < -0.001) continue;                       // overlapping holes are reported by the hole cutter, not here
+      if (h.d <= 0.45 && o.d <= 0.45) gapVia = Math.min(gapVia, gap); else gapPad = Math.min(gapPad, gap);
+    }
+  }
+  let silk = Infinity;
+  for (const t of ['top-silk', 'bottom-silk']) for (const o of opsOf(t)) if ((o.t === 'line' || o.t === 'arc') && o.dark && (onBoard(o.x1, o.y1) || onBoard(o.x2, o.y2))) {
+    const w = traceWidth(o); if (w > 0.01) silk = Math.min(silk, w);
+  }
+  const fin = v => isFinite(v) ? v : null;
+  return built.fab = {
+    W: built.W, H: built.H, layers: copperLayers, minTrace: fin(minTrace), edge: fin(edge), edgeAt,
+    minPTH: minOf(pth, h => h.d), minNPTH: minOf(npth, h => h.d), maxDrill: minOf(holes, h => -h.d) != null ? -minOf(holes, h => -h.d) : null,
+    viaRing: fin(viaRing), padRing: fin(padRing), noPad, holeEdge: fin(holeEdge), gapVia: fin(gapVia), gapPad: fin(gapPad), silk: fin(silk),
+    nHoles: holes.length,
+  };
+}
+function renderFab() {
+  const el = document.getElementById('fab'), sel = document.getElementById('fabProfile');
+  sel.value = state.fab;
+  if (!built) { el.innerHTML = '<p class="muted" style="margin:0">Load a board to check it against the manufacturer\'s limits.</p>'; return; }
+  const P = FAB[state.fab] || FAB.jlc, f = fabStats(), n = Math.max(1, f.layers);
+  const rows = [];
+  // status: ok / warn (allowed but below the recommended value or extra cost) / bad / na (not measured or no published limit)
+  const minCheck = (v, min, rec) => v == null || min == null ? 'na' : v < min - 1e-6 ? 'bad' : rec != null && v < rec - 1e-6 ? 'warn' : 'ok';
+  const lim = (min, rec, pre = '≥ ') => min == null ? 'no published limit' : pre + fmtL(min) + (rec != null && rec > min ? ` (${fmtL(rec)} recommended)` : '');
+  const add = (st, label, val, limit) => rows.push([st, label, val, limit]);
+  const [bmax0, bmax1] = P.board.max(n), big = Math.max(f.W, f.H), small = Math.min(f.W, f.H);
+  add(small < P.board.min ? 'bad' : big > bmax0 || small > bmax1 ? 'bad' : 'ok', 'Board size', `${fmtL(f.W, false)} × ${fmtL(f.H)}`, `${fmtL(P.board.min, false)} – ${fmtL(bmax0, false)} × ${fmtL(bmax1)}`);
+  add('na', 'Copper layers', String(f.layers), 'limits below use this layer count');
+  add(minCheck(f.minTrace, P.trace(n)), 'Narrowest track', f.minTrace != null ? fmtL(f.minTrace) : '—', lim(P.trace(n)));
+  if (f.nHoles) {
+    add(minCheck(f.minPTH, P.drill.min, P.drill.rec), 'Smallest plated hole', f.minPTH != null ? fmtL(f.minPTH) : '—', lim(P.drill.min, P.drill.rec));
+    if (f.minNPTH != null) add(minCheck(f.minNPTH, P.npth), 'Smallest non-plated hole', fmtL(f.minNPTH), lim(P.npth));
+    add(f.maxDrill == null ? 'na' : f.maxDrill > P.drill.max + 1e-6 ? 'bad' : 'ok', 'Largest hole', f.maxDrill != null ? fmtL(f.maxDrill) : '—', '≤ ' + fmtL(P.drill.max));
+    if (f.viaRing != null) add(minCheck(f.viaRing, P.viaRing.min, P.viaRing.rec), 'Via annular ring', fmtL(f.viaRing), lim(P.viaRing.min, P.viaRing.rec));
+    if (f.padRing != null) { const r = P.padRing(n); add(minCheck(f.padRing, r.min, r.rec), 'Pad annular ring (PTH)', fmtL(f.padRing), lim(r.min, r.rec)); }
+    if (P.holeGap) {
+      if (f.gapVia != null) add(minCheck(f.gapVia, P.holeGap.via), 'Via hole to hole', fmtL(f.gapVia), lim(P.holeGap.via));
+      if (f.gapPad != null) add(minCheck(f.gapPad, P.holeGap.pad), 'Pad hole to hole', fmtL(f.gapPad), lim(P.holeGap.pad));
+    }
+    add(f.holeEdge == null ? 'ok' : minCheck(f.holeEdge, 0.3), 'Hole to board edge', f.holeEdge != null ? fmtL(f.holeEdge) : '> 3 mm', 'rule of thumb ≥ ' + fmtL(0.3));
+  } else add('na', 'Holes', 'none', 'no drill file loaded');
+  add(f.edge == null ? 'ok' : minCheck(f.edge, P.edge), 'Copper to board edge', f.edge != null ? '≈ ' + fmtL(f.edge) : '> 3 mm', P.edge != null ? lim(P.edge) : 'no published limit');
+  if (f.silk != null) add(minCheck(f.silk, P.silk), 'Thinnest silkscreen line', fmtL(f.silk), lim(P.silk));
+  const icon = { ok: '✓', warn: '!', bad: '✗', na: '–' };
+  const bad = rows.filter(r => r[0] === 'bad').length, warn = rows.filter(r => r[0] === 'warn').length;
+  el.innerHTML = `<p class="muted" style="margin:0 0 6px">${bad ? `<b style="color:var(--err)">${bad} problem${bad > 1 ? 's' : ''}</b>` : 'No problems found'}${warn ? ` · ${warn} to review` : ''} for ${P.name} standard.</p>`
+    + '<table class="fab">' + rows.map(([st, label, val, limit]) =>
+      `<tr><td><span class="fi ${st}" aria-label="${st}">${icon[st]}</span></td><td>${label}<span class="lim">${limit}</span></td><td class="v">${val}</td></tr>`).join('') + '</table>'
+    + `<p class="fabnote">Measured from the Gerbers; spacing between copper features is not checked.${f.noPad ? ` ${f.noPad} plated hole${f.noPad > 1 ? 's have' : ' has'} no pad on the outer layers.` : ''} Limits from the <a href="${P.url}" target="_blank" rel="noopener">${P.name} capabilities page</a> (Nov 2026) — check it before ordering.</p>`;
+}
+document.getElementById('fabProfile').onchange = e => { state.fab = e.target.value; saveSettings(); renderFab(); };
+
+/* =====================================================================
+   Keyboard help
+   ===================================================================== */
+const helpEl = document.getElementById('help'), helpBtn = document.getElementById('helpBtn');
+function toggleHelp(on = helpEl.hidden) { helpEl.hidden = !on; helpBtn.setAttribute('aria-expanded', on); helpBtn.setAttribute('aria-pressed', on); }
+helpBtn.onclick = () => toggleHelp();
+document.getElementById('helpX').onclick = () => toggleHelp(false);
+
 /* ---------- UI ---------- */
 const filesEl = document.getElementById('files');
+// Physical order: top side first, then inner, bottom, outline, drills, parts
+const CARD_ORDER = ['top-silk', 'top-paste', 'top-mask', 'top-copper', 'inner', 'bottom-copper', 'bottom-mask', 'bottom-paste', 'bottom-silk',
+  'outline', 'drill', 'drill-npth', 'drill-gerber', 'pnp', 'ignore'];
+// Display settings (colour, opacity, on/off) are shared by all files of one kind
+const layerKey = t => /^drill/.test(t) ? 'holes' : t;
+const HAS_OPACITY = k => /copper|mask|silk|paste|inner|pnp/.test(k);
+// Colour dot that opens a colour picker
+function colorDot(k, label) {
+  const lab = document.createElement('label'); lab.className = 'dotpick'; lab.style.setProperty('--c', PCOL(k));
+  lab.title = 'Change ' + label.toLowerCase() + ' color';
+  const c0 = PCOL(k), inp = document.createElement('input'); inp.type = 'color'; inp.value = /^#[0-9a-f]{6}$/i.test(c0) ? c0 : '#888888'; inp.setAttribute('aria-label', lab.title);
+  inp.oninput = () => {
+    palette()[k] = inp.value;
+    document.querySelectorAll(`.dotpick[data-k="${k}"]`).forEach(d => d.style.setProperty('--c', inp.value));
+    restyleSoon();
+    document.getElementById('resetColors').hidden = false;
+  };
+  inp.onchange = () => saveSettings();
+  lab.dataset.k = k; lab.append(inp); return lab;
+}
+function staticDot(color) { const d = document.createElement('span'); d.className = 'dot'; d.style.cssText = `background:${color};margin:0 auto;width:12px;height:12px`; return d; }
+function setFileVisible(f, on) {
+  const key = layerKey(f.type);
+  f.hidden = !on; if (on) L(key).on = true;
+  if (built && /^(top|bottom)-(copper|mask|silk|paste)$/.test(f.type)) {
+    // Only this layer's picture changes: redraw it without re-reading every file
+    delete built.raster[f.type]; built.fab = null; clearCaches(); buildNetIndex(); renderFiles(); renderFab(); renderNetChip(); restyleSoon(); saveSessionSoon();
+  } else rebuild();
+}
 function renderFiles() {
   const ign = state.files.filter(f => f.type === 'ignore');
   document.getElementById('filesHead').textContent = state.files.length ? `Files (${state.files.length})` : 'Files';
   document.getElementById('clearBtn').disabled = !state.files.length;
   const rmI = document.getElementById('rmIgnored');
   rmI.hidden = !ign.length || ign.length === state.files.length; rmI.textContent = `Remove ignored (${ign.length})`;
-  if (!state.files.length) { filesEl.innerHTML = '<div class="muted">No files loaded.</div>'; return; }
+  const foot = document.getElementById('filesFoot');
+  if (!state.files.length) { filesEl.innerHTML = '<div class="muted">No files loaded.</div>'; foot.hidden = true; renderBoardRow(); return; }
   filesEl.innerHTML = '';
-  const order = Object.keys(TYPES);
-  const sorted = state.files.slice().sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type) || a.name.localeCompare(b.name));
+  const lay = isLayers();
+  const sorted = state.files.slice().sort((a, b) => CARD_ORDER.indexOf(a.type) - CARD_ORDER.indexOf(b.type) || a.name.localeCompare(b.name));
   for (const f of sorted) {
-    const el = document.createElement('div'); el.className = 'file' + (f.type === 'ignore' ? ' ignored' : '');
-    const nm = document.createElement('div'); nm.className = 'nm'; nm.title = f.name;
-    nm.innerHTML = `<span class="dot" style="background:${f.type === 'ignore' ? 'transparent' : PCOL(f.type)}"></span>`; nm.append(f.name);
+    const key = layerKey(f.type), ign = f.type === 'ignore', label = TYPES[f.type].label;
+    const shown = !f.hidden && L(key).on;
+    const el = document.createElement('div'); el.className = 'file' + (ign ? ' ignored' : '') + (!ign && !shown ? ' off' : '');
+    // colour dot: editable unless the layer has no colour in this style (outline in Realistic, parts in 3D)
+    let dot;
+    if (ign) dot = document.createElement('span');
+    else if ((key === 'outline' && !lay) || (key === 'pnp' && !state.is2D)) dot = staticDot(LCOL(key));
+    else dot = colorDot(key, label);
+    let cb;
+    if (ign) cb = document.createElement('span');
+    else {
+      cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = shown; cb.title = 'Show or hide this layer';
+      cb.setAttribute('aria-label', 'Show ' + f.name);
+      cb.onchange = () => setFileVisible(f, cb.checked);
+    }
+    const nm = document.createElement('div'); nm.className = 'nm'; nm.title = f.name; nm.textContent = f.name;
     const sel = document.createElement('select'); sel.setAttribute('aria-label', 'Layer type for ' + f.name);
     for (const [k, v] of Object.entries(TYPES)) { const o = document.createElement('option'); o.value = k; o.textContent = v.label; if (k === f.type) o.selected = true; sel.append(o); }
-    sel.onchange = () => { f.type = sel.value; rebuild(); };
-    const stt = document.createElement('div'); stt.className = 'st';
-    if (f.err) { stt.className += ' err'; stt.textContent = 'Parse error: ' + f.err; }
-    else if (f.type === 'ignore') stt.textContent = f.hint || ignoreHint(f.name, f.binary);
-    else if (f.parsed?.comps) stt.textContent = f.parsed.comps.length + ' components' + (f.note ? ' · ' + f.note : '');
-    else if (f.parsed?.holes) stt.textContent = f.parsed.holes.length + ' holes';
-    else if (f.parsed?.ops) stt.textContent = f.parsed.ops.length + ' objects' + (f.parsed.warnings?.length ? ' · ' + f.parsed.warnings.join('; ') : '');
+    sel.onchange = () => { f.type = sel.value; f.hidden = false; rebuild(); };
     const del = document.createElement('button'); del.className = 'xbtn'; del.textContent = '×';
     del.title = 'Remove ' + f.name; del.setAttribute('aria-label', 'Remove ' + f.name);
     del.onclick = () => removeFiles([f], f.name);
-    el.append(nm, sel, del, stt); filesEl.append(el);
+    const r2 = document.createElement('div'); r2.className = 'r2'; r2.append(sel);
+    const stt = document.createElement('div'); stt.className = 'st';
+    if (f.err) { stt.className += ' err'; stt.textContent = 'Parse error: ' + f.err; }
+    else if (ign) stt.textContent = f.hint || ignoreHint(f.name, f.binary);
+    else if (f.parsed?.comps) stt.textContent = f.parsed.comps.length + ' components' + (f.note ? ' · ' + f.note : '');
+    else if (f.parsed?.holes) stt.textContent = f.parsed.holes.length + ' holes';
+    else if (f.parsed?.ops) stt.textContent = f.parsed.ops.length + ' objects' + (f.parsed.warnings?.length ? ' · ' + f.parsed.warnings.join('; ') : '')
+      + (f.type === 'inner' && !lay && subOpacity() >= 0.999 && state.explode < 0.001 ? ' · visible when the board is see-through' : '');
+    if (!ign && HAS_OPACITY(key)) {
+      const rg = document.createElement('input'); rg.type = 'range'; rg.min = 0; rg.max = 100; rg.value = Math.round(L(key).a * 100);
+      rg.dataset.akey = key; rg.title = 'Opacity'; rg.setAttribute('aria-label', f.name + ' opacity');
+      rg.oninput = () => {
+        L(key).a = rg.value / 100;
+        document.querySelectorAll(`input[data-akey="${key}"]`).forEach(x => { if (x !== rg) x.value = rg.value; });
+        layerChanged(key, true);
+      };
+      r2.append(rg);
+    }
+    el.append(dot, cb, nm, del, r2, stt); filesEl.append(el);
   }
-}
-
-const LAYER_ROWS = [   // [key, label, has opacity slider]
-  ['top-silk', 'Top silk', 1], ['top-paste', 'Top paste', 1], ['top-mask', 'Top mask', 1], ['top-copper', 'Top copper', 1],
-  ['inner', 'Inner copper', 1], ['bottom-copper', 'Bottom copper', 1], ['bottom-mask', 'Bottom mask', 1],
-  ['bottom-paste', 'Bottom paste', 1], ['bottom-silk', 'Bottom silk', 1], ['outline', 'Outline', 0], ['holes', 'Holes', 0], ['pnp', 'Components', 1],
-];
-const layersEl = document.getElementById('layers');
-// Colour dot that opens a colour picker (used by the Layer colors style)
-function colorDot(k, label) {
-  const lab = document.createElement('label'); lab.className = 'dotpick'; lab.style.setProperty('--c', PCOL(k));
-  lab.title = 'Change ' + label.toLowerCase() + ' color';
-  const c0 = PCOL(k), inp = document.createElement('input'); inp.type = 'color'; inp.value = /^#[0-9a-f]{6}$/i.test(c0) ? c0 : '#888888'; inp.setAttribute('aria-label', lab.title);
-  inp.oninput = () => {
-    palette()[k] = inp.value; lab.style.setProperty('--c', inp.value);
-    restyleSoon();
-    if (k !== 'board') renderFiles();
-    document.getElementById('resetColors').hidden = false;
-  };
-  inp.onchange = () => saveSettings();
-  lab.append(inp); return lab;
-}
-function renderLayers() {
-  if (!built) { layersEl.innerHTML = '<div class="muted">Load files to see layers.</div>'; return; }
-  const present = k => k === 'inner' ? built.inners.length : k === 'holes' ? built.holes.length : k === 'pnp' ? built.comps.length : opsOf(k).length;
-  const lay = isLayers();
-  layersEl.innerHTML = '';
-  for (const [k, label, hasA] of LAYER_ROWS) {
-    if (!present(k)) continue;
-    if (k === 'outline' && !lay) continue;              // the outline line is only drawn in Layer colors style
-    const l = L(k), row = document.createElement('div'); row.className = 'lrow' + (l.on ? '' : ' off');
-    const lab = document.createElement('label');
-    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = l.on; cb.setAttribute('aria-label', 'Show ' + label);
-    lab.append(cb, k === 'inner' && built.inners.length > 1 ? `${label} ×${built.inners.length}` : label);
-    // Colours are editable in Layer colors style; in Realistic the dot just identifies the layer
-    let dot;
-    if (k !== 'pnp' || state.is2D) dot = colorDot(k, label);
-    else { dot = document.createElement('span'); dot.className = 'dot'; dot.style.background = LCOL(k); }
-    row.append(dot, lab);
-    cb.onchange = () => { l.on = cb.checked; row.classList.toggle('off', !l.on); layerChanged(k); };
-    if (hasA) {
-      const rg = document.createElement('input'); rg.type = 'range'; rg.min = 0; rg.max = 100; rg.value = Math.round(l.a * 100);
-      rg.setAttribute('aria-label', label + ' opacity'); rg.title = 'Opacity';
-      rg.oninput = () => { l.a = rg.value / 100; layerChanged(k, true); };
-      row.append(rg);
-    } else row.append(document.createElement('span'));
-    layersEl.append(row);
-  }
-  {
-    // Board colour: no checkbox, so a spacer keeps the name aligned with the rows above
-    const l = L('board'), row = document.createElement('div'); row.className = 'lrow' + (l.on ? '' : ' off');
-    const name = lay ? 'Board background' : 'Board material';
-    const lab = document.createElement('label');
-    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = l.on; cb.setAttribute('aria-label', 'Show ' + name.toLowerCase());
-    lab.append(cb, name);
-    cb.onchange = () => { l.on = cb.checked; row.classList.toggle('off', !l.on); layerChanged('board'); };
-    // The slider is the same setting as Substrate opacity in Appearance
-    const rg = document.createElement('input'); rg.type = 'range'; rg.min = 10; rg.max = 100; rg.id = 'boardRowOp';
-    rg.value = Math.round(state.boardOpacity * 100); rg.title = 'Opacity'; rg.setAttribute('aria-label', name + ' opacity');
-    rg.oninput = () => setSubstrate(rg.value / 100);
-    row.append(colorDot('board', name), lab, rg);
-    layersEl.append(row);
-  }
-  const foot = document.createElement('div'); foot.className = 'lfoot';
-  foot.innerHTML = '<span class="muted">Click a dot to change its color' + (lay ? '' : ' in 3D') + '.</span> <button class="linkbtn" id="resetColors">Reset colors</button>';
-  layersEl.append(foot);
+  foot.hidden = false;
+  document.getElementById('filesFootTxt').textContent = 'Click a dot to change a color' + (lay ? '' : ' (3D colors)') + '.';
   const rb = document.getElementById('resetColors');
   rb.hidden = !Object.keys(palette()).length;
-  rb.onclick = () => { if (lay) state.colors = {}; else state.rcolors = {}; renderLayers(); renderFiles(); restyle(); };
-  if (built.inners.length && !lay) layersEl.insertAdjacentHTML('beforeend', '<p class="muted" style="margin:6px 0 0">Inner layers show through when substrate opacity is below 100% (or X-ray is on), or in the exploded view.</p>');
+  rb.onclick = () => { if (isLayers()) state.colors = {}; else state.rcolors = {}; renderFiles(); restyle(); };
+  renderBoardRow();
 }
+// Board material (or 2D board background): colour, on/off and opacity, in Appearance
+function renderBoardRow() {
+  const name = isLayers() ? 'Board background' : 'Board material';
+  document.getElementById('boardName').textContent = name;
+  const holder = document.getElementById('boardDot'); holder.innerHTML = ''; holder.append(colorDot('board', name));
+  const cb = document.getElementById('boardOn'); cb.checked = L('board').on;
+  document.getElementById('boardRow').classList.toggle('off', !L('board').on);
+}
+document.getElementById('boardOn').onchange = e => { L('board').on = e.target.checked; renderBoardRow(); layerChanged('board'); };
+function renderLayers() { renderFiles(); }
 function layerChanged(k, opacityOnly) {
   if (k === 'pnp' && opacityOnly) { const g = board(); if (g) setCompOpacity(g); saveSettings(); return; }
   restyleSoon();
@@ -2033,7 +2449,7 @@ function updateInfo() {
   const info = document.getElementById('info'), b = state.board;
   if (!b) { info.innerHTML = '<dt>Size</dt><dd>—</dd>'; return; }
   const rows = [
-    ['Size', `${b.w.toFixed(2)} × ${b.h.toFixed(2)} mm`],
+    ['Size', `${fmtL(b.w, false)} × ${fmtL(b.h)}`],
     ['Outline', b.hasOutline
       ? 'From ' + b.outlineFrom + (b.cutouts ? ` · ${b.cutouts} cutout${b.cutouts > 1 ? 's' : ''}` : '') + (b.ignoredShapes ? ` · ${b.ignoredShapes} larger shape${b.ignoredShapes > 1 ? 's' : ''} ignored (drawing frame)` : '')
       : 'Not found · framed around the pads'],
@@ -2043,6 +2459,7 @@ function updateInfo() {
     ['Thickness', state.thick + ' mm'],
   ];
   if (built?.inners.length) rows.push(['Inner layers', built.inners.length]);
+  rows.push(['Net names', !built ? '—' : built.hasNets ? `${built.nets.size} nets · hover a pad, click to highlight` : 'Not in these files (export Gerber X2 with netlist attributes)']);
   if (built?.comps.length) rows.push(['Components', `${built.comps.filter(c => !c.bottom).length} top · ${built.comps.filter(c => c.bottom).length} bottom`]);
   info.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
 }
@@ -2150,7 +2567,7 @@ function saveSessionSoon() {
   clearTimeout(sessionTimer);
   sessionTimer = setTimeout(async () => {
     try {
-      const files = state.files.map(f => ({ name: f.name, text: f.text, type: f.type, binary: !!f.binary, hint: f.hint || null }));
+      const files = state.files.map(f => ({ name: f.name, text: f.text, type: f.type, binary: !!f.binary, hint: f.hint || null, hidden: !!f.hidden }));
       const size = files.reduce((n, f) => n + f.text.length, 0);
       await idb.put('session', size < 150e6 ? { files, saved: Date.now() } : null);   // very large sets are not kept
     } catch (e) { /* storage unavailable (private window, blocked site data) */ }
@@ -2161,7 +2578,7 @@ async function restoreSession() {
   try { ses = await idb.get('session'); } catch { return; }
   if (!ses?.files?.length || state.files.length) return;
   restoring = true;
-  for (const f of ses.files) state.files.push({ id: ++uid, name: f.name, text: f.text || '', type: f.type, binary: f.binary, hint: f.hint || undefined });
+  for (const f of ses.files) state.files.push({ id: ++uid, name: f.name, text: f.text || '', type: f.type, binary: f.binary, hint: f.hint || undefined, hidden: !!f.hidden });
   rebuild(true, () => {
     restoring = false;
     showToast(`Reopened your last board (${ses.files.length} file${ses.files.length > 1 ? 's' : ''})`, 'Clear', () => removeFiles(state.files.slice()), 10000);
@@ -2267,10 +2684,21 @@ document.querySelectorAll('.seg [data-mode]').forEach(b => b.onclick = () => { c
 document.getElementById('measBtn').onclick = () => setMeasure(!state.meas.on);
 addEventListener('keydown', e => {
   if (/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName || '') || e.ctrlKey || e.metaKey) return;
-  if (e.key === 'm' || e.key === 'M') setMeasure(!state.meas.on);
-  else if (e.key === '2' && !state.is2D) set2D(true);
-  else if (e.key === '3' && state.is2D) set2D(false);
-  else if (e.key === 'Escape') { state.meas.pts = []; state.meas.hover = null; updateMeasureHelpers(); }
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key, view = v => document.querySelector(`.toolbar [data-view="${v}"]`)?.click();
+  if (k === 'm') setMeasure(!state.meas.on);
+  else if (k === '2' && !state.is2D) set2D(true);
+  else if (k === '3' && state.is2D) set2D(false);
+  else if (k === 't') view('top');
+  else if (k === 'b') view('bottom');
+  else if (k === 'i') view('iso');
+  else if (k === 'f' && !state.is2D) view('flip');
+  else if (k === 'x') document.getElementById('xrayBtn').click();
+  else if (k === '?' || (k === '/' && e.shiftKey)) toggleHelp();
+  else if (k === 'Escape') {
+    if (!helpEl.hidden) { toggleHelp(false); return; }
+    state.meas.pts = []; state.meas.hover = null; updateMeasureHelpers();
+    if (state.net) setNet(null);
+  }
 });
 
 // Export
@@ -2392,9 +2820,10 @@ document.addEventListener('drop', e => {
 }, true);
 
 set2D(state.is2D, true);   // opens in 2D by default; the last choice is remembered
+renderBoardRow(); renderFab();
 restoreSession();
 syncStyleSel();
-window.__viewer = { state, setView, set2D, parsePnP, pkgSize, board };
+window.__viewer = { state, setView, set2D, parsePnP, pkgSize, board, cam: () => cam, netAt };
 </script>
 </body>
 </html>

@@ -35,20 +35,32 @@ No installation, no build step and no server. Files are processed locally in you
 
 - **Real board shape** from the outline layer, including internal cutouts, slots and notches. Plated and non-plated holes are cut through the board, and plated holes get metal barrels.
 - **All common layers drawn**: top and bottom copper, solder mask, silkscreen and paste, any number of inner copper layers, outline and drills.
-- **Layers panel**: every layer has an on/off checkbox, an opacity slider and a color dot. Click a dot to change that layer's color. Layers and Realistic styles keep separate palettes; **Reset colors** restores the defaults of the current style.
-- **Board row**: switch the board material (or 2D board background) off, change its color or opacity.
+- **One card per file**: each file card has a show/hide checkbox, an opacity slider, a color dot and the layer-type dropdown, listed in physical order (top silkscreen down to bottom silkscreen, then outline, drills and pick-and-place). Hiding one file hides only that file, so for example the PTH and NPTH drill files can be switched separately. Click a dot to change that layer's color; Layers and Realistic styles keep separate palettes, and **Reset colors** under the list restores the defaults of the current style.
 - **Components** from a pick-and-place file. In 3D they are boxes sized from the package name; in 2D they are flat outlines so pads and silkscreen stay visible (bottom-side parts are drawn fainter). Hover a part to see its designator, value, package and side.
+
+### Nets and pins
+
+- When the Gerbers carry **X2 netlist attributes** (KiCad and recent Altium exports can include them), hovering a pad or track shows its **net**, the **part and pin** (for example *I2C_SDA · U1 pin 5*) and the layer.
+- **Click** a pad or track to highlight the whole net on every copper layer; the rest of the board dims. A label shows the number of layers and pads and the total track length. **Esc** or **×** clears it.
+- The Board panel says how many nets were found, or that the files have no net names.
+
+### Fab check
+
+- Checks the board against the published standard limits of **JLCPCB** or **PCBWay** (choose in the panel): board size, narrowest track, smallest plated and non-plated holes, largest hole, via and pad annular rings, hole-to-hole spacing, hole and copper distance to the board edge, and the thinnest silkscreen line.
+- Each line shows the measured value, the limit and ✓ / ! (allowed but below the recommended value) / ✗.
+- Values are measured from the Gerbers. Spacing between copper features is **not** checked, and limits change over time — confirm on the manufacturer's capabilities page before ordering.
 
 ### Appearance
 
-- Solder mask color (green, red, blue, black, white, purple, yellow), surface finish (ENIG, HASL, bare copper), silkscreen color and board thickness (presets from 0.4 to 3.2 mm, or any custom value from 0.1 to 10 mm). Per-side colors can be set from the Layers panel.
-- Substrate opacity slider (same as the X-ray button, with any level).
+- Solder mask color (green, red, blue, black, white, purple, yellow), surface finish (ENIG, HASL, bare copper), silkscreen color and board thickness (presets from 0.4 to 3.2 mm, or any custom value from 0.1 to 10 mm). Per-side colors can be set with the dots on the file cards.
+- **Board material** row: show or hide the board material (in Layers style, the board background), change its color, and set its opacity (the same setting the X-ray button uses).
 - Viewport background: follow the light/dark theme, pick a preset or any custom color.
 - Light, dark or automatic theme (button in the header).
 
 ### Measuring
 
-- Press **M** or click **Measure**, then click two points. Shows distance (mm and mil), ΔX / ΔY, angle and both coordinates.
+- Press **M** or click **Measure**, then click two points. Shows distance, ΔX / ΔY, angle and both coordinates.
+- **Units**: switch between **mm**, **mil** and **inch** in the Board panel; measurements, coordinates, board size, net lengths and the fab check all follow.
 - Points snap to pad, hole and component centres; hold **Alt** to place freely. **Esc** clears.
 - The cursor position in board coordinates is shown in the bottom-right corner.
 
@@ -66,7 +78,7 @@ No installation, no build step and no server. Files are processed locally in you
 
 ### Remembered settings
 
-Colors, opacities, style, 2D/3D choice, thickness, background and theme are saved in the browser and restored next time. The loaded files are kept in the browser's own storage (IndexedDB) so the last board reopens after a reload; they never leave your computer, and **Clear all** removes them. Very large sets (over about 150 MB) are not kept.
+Colors, opacities, style, 2D/3D choice, units, fab-check manufacturer, thickness, background and theme are saved in the browser and restored next time. The loaded files are kept in the browser's own storage (IndexedDB) so the last board reopens after a reload; they never leave your computer, and **Clear all** removes them. Very large sets (over about 150 MB) are not kept.
 
 ## Supported input
 
@@ -81,6 +93,7 @@ Colors, opacities, style, 2D/3D choice, thickness, background and theme are save
 - Block apertures (`AB`), including nested blocks and blocks flashed with clear polarity
 - Aperture transformations: mirroring (`LM`), rotation (`LR`) and scaling (`LS`), applied to flashes, draws and block apertures
 - X2 file attributes (`%TF.FileFunction`) for automatic layer detection, including inner layer order
+- X2 object attributes (`%TO.N` net, `%TO.P` pad, `%TO.C` component, `%TD`) for net and pin information
 
 ### Excellon drill
 
@@ -135,11 +148,18 @@ Non-Gerber files inside a zip (PDF, images, `.gbrjob`, reports, etc.) are skippe
 | Key | Action |
 |---|---|
 | **2** / **3** | Switch to 2D / 3D |
+| **T** / **B** | Look at the top / bottom |
+| **I** | Angled 3D view |
+| **F** | Flip the board (3D) |
+| **X** | X-ray on/off |
 | **M** | Measure on/off |
-| **Esc** | Clear the measurement |
 | **Alt** (while measuring) | Place a point without snapping |
+| **Esc** | Clear the measurement and net highlight |
+| **?** | Show the shortcut list |
 
-Toolbar: **2D | 3D**, **Style** (Layers / Realistic), **Iso**, **Top**, **Bottom**, **Flip**, **X-ray**, **Measure**, **PNG**.
+Click a pad or track to highlight its net (files with net names).
+
+Toolbar: **2D | 3D**, **Style** (Layers / Realistic), **Iso**, **Top**, **Bottom**, **Flip**, **X-ray**, **Measure**, **PNG**, **?** (shortcuts).
 
 ## Limitations
 
