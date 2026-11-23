@@ -14,68 +14,147 @@
 <style>
 :root{
   --bg:#e8e9ed; --panel:#ffffff; --ink:#1d2129; --muted:#6b7280; --line:#e2e4e9;
-  --accent:#1f6f43; --accent-ink:#fff; --chip:#f3f4f6; --warn:#b45309; --err:#b91c1c;
+  --accent:#1f6f43; --accent-ink:#fff; --chip:#f3f4f6; --field:#ffffff; --glass:rgba(255,255,255,.86);
+  --scene:#e8e9ed; --warn:#b45309; --err:#b91c1c; --meas:#ff3d71;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#15171b; --panel:#1d2026; --ink:#e6e8ec; --muted:#98a0ac; --line:#2d3139;
+    --accent:#2e9a5e; --chip:#262a31; --field:#16181d; --glass:rgba(29,32,38,.88); --scene:#17191e; --err:#f87171;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15171b; --panel:#1d2026; --ink:#e6e8ec; --muted:#98a0ac; --line:#2d3139;
+  --accent:#2e9a5e; --chip:#262a31; --field:#16181d; --glass:rgba(29,32,38,.88); --scene:#17191e; --err:#f87171;
 }
 *{box-sizing:border-box}
+[hidden]{display:none !important}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
   font:13px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 #app{display:flex;height:100%}
-aside{width:320px;flex:none;background:var(--panel);border-right:1px solid var(--line);
+aside{width:330px;flex:none;background:var(--panel);border-right:1px solid var(--line);
   display:flex;flex-direction:column;overflow:hidden}
-aside header{padding:16px 16px 12px;border-bottom:1px solid var(--line)}
+aside header{padding:16px 16px 12px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
 aside h1{font-size:15px;margin:0 0 2px;font-weight:650;letter-spacing:.2px}
 aside header p{margin:0;color:var(--muted);font-size:12px}
 .scroll{overflow:auto;flex:1;padding:12px 16px 20px}
-.sec{margin:14px 0 6px;font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.sec{margin:16px 0 6px;font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.muted{color:var(--muted);font-size:12px}
 .btns{display:flex;gap:8px;flex-wrap:wrap}
 button,.btn{appearance:none;border:1px solid var(--line);background:var(--chip);color:var(--ink);
   border-radius:7px;padding:7px 11px;font:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
-button:hover,.btn:hover{border-color:#c9ccd3}
+button:hover,.btn:hover{border-color:var(--muted)}
+button:disabled{opacity:.45;cursor:default}
 .primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .primary:hover{filter:brightness(1.08);border-color:var(--accent)}
+.small{padding:4px 8px;font-size:12px}
 #files{display:flex;flex-direction:column;gap:6px;margin-top:4px}
 .file{border:1px solid var(--line);border-radius:8px;padding:7px 8px;display:grid;
-  grid-template-columns:1fr auto;gap:4px 8px;align-items:center}
+  grid-template-columns:1fr auto auto;gap:4px 6px;align-items:center}
+.file.ignored{opacity:.75}
+.xbtn{width:24px;height:24px;padding:0;justify-content:center;border-radius:6px;background:transparent;border-color:transparent;
+  color:var(--muted);font-size:16px;line-height:1}
+.xbtn:hover{background:var(--chip);color:var(--err);border-color:var(--line)}
+.sec-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.sec-row .linkbtn{text-transform:none;letter-spacing:0;font-weight:500}
+#toast{position:absolute;left:50%;bottom:44px;transform:translate(-50%,12px);opacity:0;pointer-events:none;
+  display:flex;align-items:center;gap:14px;background:var(--ink);color:var(--bg);padding:8px 10px 8px 14px;border-radius:10px;
+  font-size:12.5px;box-shadow:0 6px 20px rgba(0,0,0,.22);transition:opacity .18s ease,transform .18s ease;z-index:5;max-width:min(90%,460px)}
+#toast.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+#toast span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#toast button{background:transparent;border:1px solid currentColor;color:inherit;padding:4px 10px;font-weight:600}
 .file .nm{font-size:12px;font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.file .st{grid-column:1/3;font-size:11px;color:var(--muted)}
+.file .st{grid-column:1/4;font-size:11px;color:var(--muted)}
 .file .st.err{color:var(--err)}
-.file select{font:inherit;font-size:12px;padding:3px 4px;border-radius:6px;border:1px solid var(--line);background:#fff}
-.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px;border:1px solid rgba(0,0,0,.15)}
+select,input[type=number]{font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:6px}
+.file select{font-size:12px;padding:3px 4px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px;border:1px solid rgba(127,127,127,.35);flex:none}
 .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:7px 0}
-.row label{color:var(--ink)}
-.row select,.row input[type=number]{font:inherit;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:#fff}
+.row select,.row input[type=number]{padding:4px 6px}
 .row input[type=number]{width:72px}
-.swatches{display:flex;gap:6px}
-.sw{width:22px;height:22px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line);cursor:pointer;padding:0}
-.sw[aria-pressed=true]{box-shadow:0 0 0 2px var(--ink)}
-.toggle{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
-.toggle input{accent-color:var(--accent);width:15px;height:15px}
-.info{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12px}
+.rng{display:flex;align-items:center;gap:8px}
+.rng output{width:38px;text-align:right;font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px}
+input[type=range]{accent-color:var(--accent);width:120px}
+/* Colour pickers: label + current name on one line, swatches in an even row below */
+.field{margin:10px 0 12px}
+.field-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.field-val{font-size:12px;color:var(--muted)}
+.swatches{display:grid;grid-template-columns:repeat(var(--n,8),1fr);gap:6px;justify-items:center;
+  padding:8px;border:1px solid var(--line);border-radius:12px;background:var(--chip)}
+.sw{position:relative;width:24px;height:24px;border-radius:50%;padding:0;cursor:pointer;
+  border:0;box-shadow:inset 0 0 0 1px rgba(127,127,127,.35);
+  transition:transform .12s ease,box-shadow .12s ease}
+.sw:hover{transform:scale(1.1)}
+.sw:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sw[aria-pressed=true]{box-shadow:inset 0 0 0 1px rgba(127,127,127,.35),0 0 0 2px var(--chip),0 0 0 4px var(--accent)}
+/* Custom colour: rainbow ring around the chosen colour */
+.sw-custom{display:block;background:conic-gradient(#ff4d4d,#ffd24d,#5ce65c,#4dd2ff,#5c6cff,#d24dff,#ff4d4d);box-shadow:none}
+.sw-custom::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--c,var(--panel));
+  box-shadow:0 0 0 1.5px var(--chip)}
+.sw-custom:not([aria-pressed=true])::after{background:var(--chip);
+  -webkit-mask:linear-gradient(#000 0 0) center/2px 10px no-repeat,linear-gradient(#000 0 0) center/10px 2px no-repeat;
+          mask:linear-gradient(#000 0 0) center/2px 10px no-repeat,linear-gradient(#000 0 0) center/10px 2px no-repeat;
+  background:var(--ink);inset:0;box-shadow:none}
+.sw-custom input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
+.lrow{display:grid;grid-template-columns:16px 1fr auto;align-items:center;gap:8px;margin:4px 0}
+.lrow .dot{margin:0 auto;width:12px;height:12px}
+.cbspace{display:inline-block;width:15px;flex:none}
+.dotpick{position:relative;display:block;width:16px;height:16px;border-radius:50%;cursor:pointer;background:var(--c);
+  box-shadow:inset 0 0 0 1px rgba(127,127,127,.4),0 0 0 2px var(--panel),0 0 0 3px var(--line);transition:transform .12s ease}
+.dotpick:hover{transform:scale(1.15)}
+.dotpick:focus-within{box-shadow:inset 0 0 0 1px rgba(127,127,127,.4),0 0 0 2px var(--panel),0 0 0 4px var(--accent)}
+.dotpick input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
+.lfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0 0;font-size:12px}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);font:inherit;font-size:12px;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.lrow label{display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12.5px;min-width:0}
+.lrow input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px;margin:0}
+.lrow input[type=range]{width:96px}
+.lrow.off label{color:var(--muted)}
+.info{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12px;margin:0}
 .info dt{color:var(--muted)} .info dd{margin:0;font-variant-numeric:tabular-nums}
 main{flex:1;position:relative;min-width:0}
 #view{position:absolute;inset:0}
 #view canvas{display:block;width:100%;height:100%;outline:none}
-.toolbar{position:absolute;top:12px;right:12px;display:flex;gap:6px;background:rgba(255,255,255,.85);
-  backdrop-filter:blur(6px);padding:5px;border-radius:10px;border:1px solid var(--line)}
+#view.measuring canvas{cursor:crosshair}
+.toolbar{position:absolute;top:12px;right:12px;display:flex;gap:4px;background:var(--glass);
+  backdrop-filter:blur(6px);padding:5px;border-radius:10px;border:1px solid var(--line);align-items:center}
 .toolbar button{background:transparent;border-color:transparent;padding:6px 9px}
 .toolbar button:hover{background:var(--chip)}
+.toolbar button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
+.toolbar .sep{width:1px;height:20px;background:var(--line);margin:0 3px}
+/* 2D | 3D switch */
+.seg{display:flex;padding:2px;gap:2px;background:var(--chip);border:1px solid var(--line);border-radius:8px}
+.seg button{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:6px;font-weight:600;color:var(--muted)}
+.seg button svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linejoin:round}
+.seg button:hover{background:var(--panel);color:var(--ink)}
+.seg button[aria-checked=true]{background:var(--accent);color:var(--accent-ink);box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.seg-sm button{padding:5px 10px;font-weight:550}
+.tlabel{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:0 2px 0 4px}
+.toolbar button[data-view].current{box-shadow:inset 0 -2px 0 var(--accent);color:var(--ink);border-radius:6px}
+body.mode2d .only3d{display:none}
 .hint{position:absolute;left:12px;bottom:10px;color:var(--muted);font-size:11px;
-  background:rgba(255,255,255,.7);padding:4px 8px;border-radius:6px}
+  background:var(--glass);padding:4px 8px;border-radius:6px}
+#coords{position:absolute;right:12px;bottom:10px;font-size:11.5px;font-variant-numeric:tabular-nums;
+  background:var(--glass);padding:4px 8px;border-radius:6px;display:none;border:1px solid var(--line)}
+#mlabel{position:absolute;transform:translate(-50%,-140%);background:var(--meas);color:#fff;font-size:12px;font-weight:600;
+  padding:3px 8px;border-radius:6px;pointer-events:none;display:none;white-space:nowrap;font-variant-numeric:tabular-nums}
+#tip{position:absolute;pointer-events:none;display:none;background:var(--panel);color:var(--ink);border:1px solid var(--line);
+  border-radius:7px;padding:5px 8px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.18);max-width:260px}
+#tip b{font-weight:650}
 #empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
-#empty .card{pointer-events:auto;text-align:center;background:var(--panel);border:1.5px dashed #c3c7cf;
-  border-radius:14px;padding:28px 34px;max-width:420px}
+#empty .card{pointer-events:auto;text-align:center;background:var(--panel);border:1.5px dashed var(--line);
+  border-radius:14px;padding:28px 34px;max-width:440px}
 #empty h2{margin:0 0 6px;font-size:17px}
 #empty p{margin:0 0 16px;color:var(--muted)}
 #drop{position:fixed;inset:0;background:rgba(31,111,67,.12);border:3px dashed var(--accent);
   display:none;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:var(--accent);z-index:10}
 #drop.on{display:flex}
-#busy{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:var(--ink);color:#fff;
+#busy{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:var(--ink);color:var(--bg);
   padding:6px 12px;border-radius:20px;font-size:12px;display:none}
 #busy.on{display:block}
-.menu-btn{display:none}
 @media (max-width:760px){
   #app{flex-direction:column-reverse}
-  aside{width:100%;height:42vh;border-right:0;border-top:1px solid var(--line)}
+  aside{width:100%;height:44vh;border-right:0;border-top:1px solid var(--line)}
   main{flex:1}
   .toolbar{left:12px;right:auto;flex-wrap:wrap}
   .hint{display:none}
@@ -86,36 +165,63 @@ main{flex:1;position:relative;min-width:0}
 <div id="app">
   <aside>
     <header>
-      <h1>Gerber 3D Viewer</h1>
-      <p>Drop Gerber + Excellon drill files or a .zip. Everything runs locally in your browser.</p>
+      <div>
+        <h1>Gerber 3D Viewer</h1>
+        <p>Drop Gerber, Excellon drill and pick-and-place files or a .zip. Everything runs locally in your browser.</p>
+      </div>
+      <button id="themeBtn" class="small" title="Switch theme">Auto</button>
     </header>
     <div class="scroll">
       <div class="btns">
         <label class="btn primary" for="fileInput">Open files…</label>
         <input id="fileInput" type="file" multiple hidden>
-        <button id="clearBtn">Clear</button>
+        <button id="clearBtn" disabled>Clear all</button>
       </div>
 
+      <div class="sec sec-row"><span id="filesHead">Files</span><button class="linkbtn" id="rmIgnored" hidden></button></div>
+      <div id="files"><div class="muted">No files loaded.</div></div>
+
       <div class="sec">Layers</div>
-      <div id="files"><div style="color:var(--muted);font-size:12px">No files loaded.</div></div>
+      <div id="layers"><div class="muted">Load files to see layers.</div></div>
 
       <div class="sec">Appearance</div>
-      <div class="row"><label>Solder mask</label>
+      <div class="row"><label for="style" id="styleLbl">Style</label>
+        <select id="style"><option value="real">Realistic</option><option value="layers">Layer colors</option></select></div>
+      <div class="field" role="group" aria-labelledby="maskLbl">
+        <div class="field-head"><span id="maskLbl">Solder mask</span><span class="field-val" id="maskName"></span></div>
         <div class="swatches" id="maskSw"></div></div>
-      <div class="row"><label>Surface finish</label>
+      <div class="row"><label for="finish">Surface finish</label>
         <select id="finish"><option value="enig">ENIG (gold)</option><option value="hasl">HASL (silver)</option><option value="copper">Bare copper</option></select></div>
-      <div class="row"><label>Silkscreen</label>
+      <div class="row"><label for="silkColor">Silkscreen</label>
         <select id="silkColor"><option value="#f4f4f2">White</option><option value="#1b1b1b">Black</option><option value="#f1d23a">Yellow</option></select></div>
-      <div class="row"><label>Thickness</label>
+      <div class="row"><label for="thick">Thickness</label>
         <div style="display:flex;gap:6px;align-items:center">
           <input id="thickCustom" type="number" min="0.1" max="10" step="0.01" value="1.6" aria-label="Custom thickness in mm" hidden>
           <select id="thick"><option value="0.4">0.4 mm</option><option value="0.6">0.6 mm</option><option value="0.8">0.8 mm</option><option value="1.0">1.0 mm</option><option value="1.2">1.2 mm</option><option value="1.6" selected>1.6 mm</option><option value="2.0">2.0 mm</option><option value="2.4">2.4 mm</option><option value="3.2">3.2 mm</option><option value="custom">Custom…</option></select>
         </div></div>
-      <div class="row" style="flex-wrap:wrap;justify-content:flex-start;gap:14px">
-        <label class="toggle"><input type="checkbox" id="tMask" checked>Mask</label>
-        <label class="toggle"><input type="checkbox" id="tSilk" checked>Silk</label>
-        <label class="toggle"><input type="checkbox" id="tCu" checked>Copper</label>
-        <label class="toggle"><input type="checkbox" id="tHoles" checked>Holes</label>
+      <div class="field" role="group" aria-labelledby="bgLbl">
+        <div class="field-head"><span id="bgLbl">Background</span><span class="field-val" id="bgName"></span></div>
+        <div class="swatches" id="bgSw"><label class="sw sw-custom" id="bgCustomSw" title="Custom color"><input type="color" id="bgCustom" aria-label="Custom background color"></label></div></div>
+      <div class="row"><label for="boardOp" title="Makes the FR4 see-through while copper, mask and silk stay visible">Substrate opacity</label>
+        <div class="rng"><input id="boardOp" type="range" min="10" max="100" value="100"><output id="boardOpV">100%</output></div></div>
+
+      <div class="sec">View</div>
+      <div class="row"><label for="explode">Explode layers</label>
+        <div class="rng"><input id="explode" type="range" min="0" max="100" value="0"><output id="explodeV">0%</output></div></div>
+      <div class="row"><label for="secAxis">Cross-section</label>
+        <select id="secAxis"><option value="off">Off</option><option value="x">Cut along X</option><option value="y">Cut along Y</option></select></div>
+      <div class="row" id="secPosRow" hidden><label for="secPos">Section position</label>
+        <div class="rng"><input id="secPos" type="range" min="0" max="1000" value="500"><output id="secPosV">50%</output></div></div>
+
+      <div class="sec">Measure</div>
+      <dl class="info" id="measInfo"></dl>
+      <p class="muted" style="margin:6px 0 0">Press <b>M</b> or use Measure in the toolbar, then click two points. Points snap to pads and holes; hold Alt to place freely. Esc clears.</p>
+
+      <div class="sec">Export</div>
+      <div class="btns">
+        <button id="pngBtn2" class="small" title="Save the current view as an image">PNG image</button>
+        <button id="glbBtn" class="small" title="3D model with colors and textures">GLB model</button>
+        <button id="stlBtn" class="small" title="Geometry only, in mm">STL mesh</button>
       </div>
 
       <div class="sec">Board</div>
@@ -126,20 +232,39 @@ main{flex:1;position:relative;min-width:0}
     <div id="view"></div>
     <div id="empty"><div class="card">
       <h2>Open a Gerber set</h2>
-      <p>KiCad, Altium, EAGLE and most other CAD exports work: copper, mask, silk, outline and drill files, loose or zipped.</p>
+      <p>KiCad, Altium, EAGLE and most other CAD exports work: copper, mask, silk, paste, outline, drill and pick-and-place files, loose or zipped.</p>
       <div class="btns" style="justify-content:center">
         <label class="btn primary" for="fileInput">Open files…</label>
       </div>
     </div></div>
     <div class="toolbar">
-      <button data-view="iso" title="Isometric">Iso</button>
-      <button data-view="top" title="Top view">Top</button>
-      <button data-view="bottom" title="Bottom view">Bottom</button>
-      <button data-view="flip" title="Flip board">Flip</button>
+      <div class="seg" role="radiogroup" aria-label="View mode">
+        <button role="radio" data-mode="2d" aria-checked="false" title="2D: flat view of the layers, pan and zoom (key 2)"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="3.5" width="11" height="9" rx="1.5"/></svg>2D</button>
+        <button role="radio" data-mode="3d" aria-checked="false" title="3D: rotate the board in space (key 3)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8 13.5 5v6L8 14.2 2.5 11V5z"/><path d="M2.5 5 8 8.2 13.5 5M8 8.2v6"/></svg>3D</button>
+      </div>
+      <span class="sep"></span>
+      <span class="tlabel">Style</span>
+      <div class="seg seg-sm" id="styleSeg" role="radiogroup" aria-label="Style">
+        <button role="radio" data-style="layers" aria-checked="false" title="Each layer in its own color, like a classic Gerber viewer">Layers</button>
+        <button role="radio" data-style="real" aria-checked="false" title="Looks like a manufactured board">Realistic</button>
+      </div>
+      <span class="sep"></span>
+      <span class="tlabel" id="viewLabel">View</span>
+      <button data-view="iso" class="only3d" title="Angled 3D view">Iso</button>
+      <button data-view="top" title="Look at the top side">Top</button>
+      <button data-view="bottom" title="Look at the bottom side">Bottom</button>
+      <button data-view="flip" class="only3d" title="Turn the board over">Flip</button>
+      <span class="sep"></span>
+      <button id="xrayBtn" aria-pressed="false" title="See-through board (X-ray)">X-ray</button>
+      <button id="measBtn" aria-pressed="false" title="Measure distance (M)">Measure</button>
       <button id="pngBtn" title="Save image">PNG</button>
     </div>
+    <div id="mlabel"></div>
+    <div id="tip"></div>
     <div id="busy">Rendering…</div>
-    <div class="hint">Drag to orbit · right-drag to pan · scroll to zoom</div>
+    <div id="toast" role="status" aria-live="polite"><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
+    <div class="hint" id="hint">Drag to orbit · right-drag to pan · scroll to zoom · M to measure</div>
+    <div id="coords"></div>
   </main>
 </div>
 <div id="drop">Drop Gerber files or .zip</div>
@@ -148,6 +273,9 @@ main{flex:1;position:relative;min-width:0}
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 /* =====================================================================
    Gerber (RS-274X) parser → display list in millimetres
@@ -519,6 +647,176 @@ function parseExcellon(text, name) {
 }
 
 /* =====================================================================
+   Pick-and-place (centroid) parser: KiCad .pos, Altium Pick Place,
+   JLC CPL .csv, EAGLE .mnt/.mnb and similar
+   ===================================================================== */
+function pnpNum(s, unit) {
+  const m = String(s ?? '').trim().replace(/^"|"$/g, '').match(/^([-+]?\d*\.?\d+(?:e[-+]?\d+)?)\s*(mm|mils?|inch|in|")?$/i);
+  if (!m) return NaN;
+  const u = m[2] ? (/^mm$/i.test(m[2]) ? 1 : /^mil/i.test(m[2]) ? 0.0254 : 25.4) : unit;
+  return parseFloat(m[1]) * u;
+}
+function splitRow(line, delim) {
+  if (delim === 'ws') return line.trim().split(/\s+/);
+  const out = []; let cur = '', q = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (q) { if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === delim) { out.push(cur.trim()); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur.trim()); return out;
+}
+function mapPnPCols(toks) {
+  const k = toks.map(t => t.toLowerCase().replace(/[^a-z]/g, ''));
+  const score = (t, ax) => {
+    if (new RegExp('^(mid|center|centre)' + ax).test(t)) return 4;
+    if (new RegExp('^(pos|loc|location)?' + ax + '(mm|mil|mils|in|inch|coord|position)?$').test(t)) return 3;
+    if (new RegExp('^ref' + ax).test(t)) return 2;
+    if (new RegExp('^pad' + ax).test(t)) return 1;
+    return 0;
+  };
+  const best = ax => { let bi = -1, bs = 0; k.forEach((t, i) => { const s = score(t, ax); if (s > bs) { bs = s; bi = i; } }); return bi; };
+  const find = re => k.findIndex(t => re.test(t));
+  const c = {
+    ref: find(/^(designator|ref|refdes|reference|refdesignator|part|partname|component|name)$/),
+    x: best('x'), y: best('y'),
+    rot: find(/^(rot|rotation|angle|rotate)/), side: find(/^(layer|side|tb|placement)$/),
+    pkg: find(/^(footprint|package|pattern|pkg|case|packagename)/), val: find(/^(value|val|comment|partvalue)$/),
+  };
+  if (c.ref < 0 || c.x < 0 || c.y < 0 || c.x === c.y) return null;
+  const hx = toks[c.x].toLowerCase();
+  c.ux = /mil/.test(hx) ? 0.0254 : /mm/.test(hx) ? 1 : /\(in/.test(hx) ? 25.4 : null;
+  return c;
+}
+function parsePnP(text, name) {
+  const lines = text.split(/\r?\n/);
+  const ext = (name.toLowerCase().split('.').pop() || '');
+  let unit = 1, unitExplicit = false;
+  const um = text.slice(0, 3000).match(/units?(?:\s+used)?\s*[:=]?\s*(mm|millimet\w*|mils?|inch\w*|in)\b/i);
+  if (um) { unit = /^(mm|milli)/i.test(um[1]) ? 1 : /^mil/i.test(um[1]) ? 0.0254 : 25.4; unitExplicit = true; }
+  let hdr = -1, cols = null, delim = 'ws';
+  for (let i = 0; i < Math.min(lines.length, 60); i++) {
+    let raw = lines[i].replace(/^\s*#+/, '').trim(); if (!raw) continue;
+    const d = raw.includes('\t') ? '\t' : raw.includes(',') ? ',' : raw.includes(';') ? ';' : 'ws';
+    if (d === 'ws') raw = raw.replace(/\b(mid|ref|pad|center|centre)\s+([xy])\b/gi, '$1$2');
+    const c = mapPnPCols(splitRow(raw, d));
+    if (c) { hdr = i; cols = c; delim = d; break; }
+  }
+  const comps = [];
+  if (cols) {
+    const ux = cols.ux ?? unit; if (cols.ux) unitExplicit = true;
+    for (let i = hdr + 1; i < lines.length; i++) {
+      const raw = lines[i]; if (!raw.trim() || /^\s*#/.test(raw)) continue;
+      const t = splitRow(raw, delim);
+      const x = pnpNum(t[cols.x], ux), y = pnpNum(t[cols.y], ux);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      if (/[a-z"]\s*$/i.test(t[cols.x] || '')) unitExplicit = true;
+      const sideS = cols.side >= 0 ? (t[cols.side] || '') : '';
+      comps.push({
+        ref: (t[cols.ref] || '').replace(/"/g, ''), x, y,
+        rot: cols.rot >= 0 ? parseFloat(String(t[cols.rot]).replace(/[^\d.+-]/g, '')) || 0 : 0,
+        bottom: /^\s*b/i.test(sideS),
+        pkg: cols.pkg >= 0 ? t[cols.pkg] || '' : '', val: cols.val >= 0 ? t[cols.val] || '' : '',
+      });
+    }
+    if (cols.side < 0 && /(bot|bottom|back)/i.test(name)) comps.forEach(c => c.bottom = true);
+  } else if (ext === 'mnt' || ext === 'mnb') {
+    for (const raw of lines) {
+      const t = raw.trim().split(/\s+/); if (t.length < 4) continue;
+      const x = parseFloat(t[1]), y = parseFloat(t[2]); if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      comps.push({ ref: t[0], x, y, rot: parseFloat(t[3]) || 0, bottom: ext === 'mnb', val: t[4] || '', pkg: t[5] || '' });
+    }
+    unitExplicit = true;
+  }
+  return { comps, unitExplicit };
+}
+function looksPnP(name, text) {
+  if (!/\.(csv|txt|pos|mnt|mnb|xy|cpl|tsv|dat)$/i.test(name) && !/pick|place|pos|centroid|cpl|xy/i.test(name)) return false;
+  try { return parsePnP(text, name).comps.length > 0; } catch { return false; }
+}
+
+// Approximate body size [length, width, height] in mm from a package / footprint name
+function pkgSize(pkg = '', ref = '') {
+  const p = String(pkg).toUpperCase(), r = String(ref).toUpperCase();
+  const CHIP = { '01005': [0.4, 0.2, 0.15], '0201': [0.6, 0.3, 0.25], '0402': [1.0, 0.5, 0.35], '0603': [1.6, 0.8, 0.45], '0805': [2.0, 1.25, 0.5],
+    '1206': [3.2, 1.6, 0.55], '1210': [3.2, 2.5, 0.6], '1812': [4.5, 3.2, 0.7], '2010': [5.0, 2.5, 0.6], '2512': [6.3, 3.2, 0.6] };
+  const chip = p.match(/(?:^|[^0-9])(01005|0201|0402|0603|0805|1206|1210|1812|2010|2512)(?![0-9])/);
+  if (chip) return CHIP[chip[1]];
+  if (/SOT-?223/.test(p)) return [6.5, 3.5, 1.6];
+  if (/SOT-?89/.test(p)) return [4.5, 2.5, 1.5];
+  if (/SOT-?(323|363)|SC-?70|SC-?88/.test(p)) return [2.0, 1.25, 0.95];
+  if (/SOT-?23|SC-?59|SOT-?346/.test(p)) return [2.9, 1.6, 1.0];
+  if (/SOD-?123/.test(p)) return [2.7, 1.6, 1.1];
+  if (/SOD-?323/.test(p)) return [1.7, 1.25, 0.9];
+  if (/SOD-?523/.test(p)) return [1.2, 0.8, 0.6];
+  if (/MINIMELF|SOD-?80/.test(p)) return [3.5, 1.5, 1.5];
+  if (/DO-?214AB|(^|[^A-Z])SMC([^A-Z]|$)/.test(p)) return [6.9, 5.9, 2.1];
+  if (/DO-?214AA|(^|[^A-Z])SMB([^A-Z]|$)/.test(p)) return [4.3, 3.6, 2.1];
+  if (/DO-?214AC|(^|[^A-Z])SMA([^A-Z]|$)/.test(p)) return [4.3, 2.6, 2.1];
+  if (/TO-?263|D2PAK/.test(p)) return [10.2, 9.1, 4.4];
+  if (/TO-?252|DPAK/.test(p)) return [6.5, 6.1, 2.3];
+  if (/TO-?220/.test(p)) return [10.2, 4.6, 9];
+  const hdr = p.match(/(\d+)X(\d+).*?P(\d+(?:\.\d+)?)/);
+  if (hdr && /HEADER|CONN|SOCKET|PIN/.test(p)) return [+hdr[2] * +hdr[3], +hdr[1] * +hdr[3], 8.5];
+  const lw = p.match(/L(\d+(?:\.\d+)?)(?:MM)?[_ -]?W(\d+(?:\.\d+)?)/);
+  if (lw) return [+lw[1], +lw[2], 1.0];
+  const sz = p.match(/(\d+(?:\.\d+)?)\s*[X×]\s*(\d+(?:\.\d+)?)(?:\s*[X×]\s*(\d+(?:\.\d+)?))?/);
+  const pinsM = p.match(/(?:SOIC|SOP|TSSOP|MSOP|SSOP|QFN|DFN|QFP|LQFP|TQFP|DIP|PDIP|BGA|SO)[-_]?(\d+)/);
+  const n = pinsM ? +pinsM[1] : 0;
+  if (/QFN|DFN|SON|MLF|LGA|BGA|QFP|CSP/.test(p) && sz && +sz[1] < 60) return [+sz[1], +sz[2], sz[3] ? +sz[3] : /BGA/.test(p) ? 1.2 : /QFP/.test(p) ? 1.4 : 0.9];
+  if (/MSOP/.test(p)) return [3, 3, 1.0];
+  if (/TSSOP|SSOP/.test(p)) return [Math.max(3, (n || 14) / 2 * 0.65 + 0.6), 4.4, 1.1];
+  if (/SOIC|SOP|(^|[^A-Z])SO-?\d/.test(p)) return [n ? n / 2 * 1.27 - 0.2 : 4.9, /W|WIDE|7\.5/.test(p.replace(/SOIC|SOP/, '')) ? 7.5 : 3.9, 1.5];
+  if (/DIP/.test(p)) return [(n || 8) / 2 * 2.54, 6.4, 3.3];
+  if (/QFP/.test(p)) { const s = { 32: 7, 44: 10, 48: 7, 52: 10, 64: 10, 80: 12, 100: 14, 128: 14, 144: 20, 176: 24, 208: 28 }[n] || 10; return [s, s, 1.4]; }
+  if (/QFN|DFN|MLF/.test(p)) { const s = n <= 8 ? 2 : n <= 16 ? 3 : n <= 24 ? 4 : n <= 32 ? 5 : n <= 48 ? 7 : 9; return [s, s, 0.9]; }
+  if (sz && +sz[1] > 0.3 && +sz[1] < 60 && +sz[2] > 0.3 && +sz[2] < 60) return [+sz[1], +sz[2], sz[3] ? +sz[3] : 1];
+  const pre = (r.match(/^[A-Z]+/) || [''])[0];
+  if (['R', 'C', 'L', 'FB', 'RN'].includes(pre)) return [1.6, 0.8, 0.45];
+  if (['D', 'LED'].includes(pre)) return [2.0, 1.25, 0.8];
+  if (pre === 'Q') return [2.9, 1.6, 1.0];
+  if (['U', 'IC'].includes(pre)) return [5, 4, 1.4];
+  if (['Y', 'X'].includes(pre)) return [3.2, 2.5, 0.8];
+  if (['J', 'P', 'CN', 'CON'].includes(pre)) return [6, 3, 4];
+  if (['SW', 'S'].includes(pre)) return [6, 3.5, 3];
+  return [2, 2, 1];
+}
+function compColor(c) {
+  const pre = (String(c.ref).toUpperCase().match(/^[A-Z]+/) || [''])[0];
+  if (pre === 'C') return '#c4a273';
+  if (pre === 'R' || pre === 'RN') return '#1e1f22';
+  if (pre === 'L' || pre === 'FB') return '#3b3d42';
+  if (['J', 'P', 'CN', 'CON'].includes(pre)) return '#e4dfd4';
+  if (pre === 'Y' || pre === 'X') return '#b9bcc2';
+  if (pre === 'LED') return '#e9e4d6';
+  return '#1b1c20';
+}
+// Make the placement file agree with the Gerbers: unit guess, mirrored bottom X, origin offset
+function fitComps(comps, b, unitExplicit) {
+  if (!comps.length) return { comps, note: '' };
+  const notes = [], m = 1;
+  const frac = (list, fx) => { let n = 0; for (const c of list) { const [x, y] = fx(c); if (x >= b[0] - m && x <= b[2] + m && y >= b[1] - m && y <= b[3] + m) n++; } return n / list.length; };
+  if (!unitExplicit) {
+    let best = 1, bf = frac(comps, c => [c.x, c.y]);
+    for (const k of [0.0254, 25.4]) { const f = frac(comps, c => [c.x * k, c.y * k]); if (f > bf + 0.2) { bf = f; best = k; } }
+    if (best !== 1) { comps.forEach(c => { c.x *= best; c.y *= best; }); notes.push(best < 1 ? 'mils → mm' : 'inches → mm'); }
+  }
+  const bots = comps.filter(c => c.bottom);
+  if (bots.length && frac(bots, c => [-c.x, c.y]) > frac(bots, c => [c.x, c.y]) + 0.2) { bots.forEach(c => c.x = -c.x); notes.push('bottom X un-mirrored'); }
+  if (frac(comps, c => [c.x, c.y]) < 0.5) {
+    const bb = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const c of comps) { bb[0] = Math.min(bb[0], c.x); bb[1] = Math.min(bb[1], c.y); bb[2] = Math.max(bb[2], c.x); bb[3] = Math.max(bb[3], c.y); }
+    if (bb[2] - bb[0] <= (b[2] - b[0]) * 1.05 + 2 && bb[3] - bb[1] <= (b[3] - b[1]) * 1.05 + 2) {
+      const dx = (b[0] + b[2]) / 2 - (bb[0] + bb[2]) / 2, dy = (b[1] + b[3]) / 2 - (bb[1] + bb[3]) / 2;
+      comps.forEach(c => { c.x += dx; c.y += dy; }); notes.push('origin offset — aligned to board');
+    } else notes.push('many parts fall outside the board');
+  }
+  return { comps, note: notes.join(', ') };
+}
+
+/* =====================================================================
    Layer type detection
    ===================================================================== */
 const TYPES = {
@@ -535,16 +833,17 @@ const TYPES = {
   'drill':         { label: 'Drill (PTH)',   color: '#111827' },
   'drill-npth':    { label: 'Drill (NPTH)',  color: '#4b5563' },
   'drill-gerber':  { label: 'Drill (Gerber)',color: '#374151' },
+  'pnp':           { label: 'Pick & place',  color: '#0ea5e9' },
   'ignore':        { label: 'Ignore',        color: 'transparent' },
 };
 
 function detectType(name, text) {
-  const n = name.toLowerCase(), ext = n.includes('.') ? n.split('.').pop() : '';
+  const n = name.toLowerCase();
   const head = text.slice(0, 4000);
   const isExcellon = /^\s*(;[^\n]*\n\s*)*M48/m.test(head) || (/^\s*(METRIC|INCH)/m.test(head) && /^T\d+.*C[\d.]+/m.test(head));
   if (isExcellon) return /npth|non.?plated|unplated/i.test(n) || /TYPE=NON_PLATED/i.test(head) ? 'drill-npth' : 'drill';
   const isGerber = /%FS|%MO|G04|%AD/.test(head);
-  if (!isGerber) return 'ignore';
+  if (!isGerber) return looksPnP(name, text) ? 'pnp' : 'ignore';
   const ff = head.match(/%TF\.FileFunction,([^*%]+)/);
   if (ff) {
     const f = ff[1].toLowerCase().split(',');
@@ -746,17 +1045,56 @@ function distToPoly(pt, poly) {
 function polyBounds(p) { const b = [Infinity, Infinity, -Infinity, -Infinity]; for (const [x, y] of p) { b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y); } return b; }
 
 /* =====================================================================
-   App state
+   App state & settings
    ===================================================================== */
+const DEF_LAYER = k => /paste/.test(k) ? { on: false, a: 0.9 } : { on: true, a: 1 };
 const state = {
   files: [],          // {id, name, text, type, parsed, err}
   mask: '#1d5a2c', finish: 'enig', silk: '#f4f4f2', thick: 1.6,
-  show: { mask: true, silk: true, cu: true, holes: true },
-  board: null, flipped: false,
+  layers: {}, boardOpacity: 1, style3D: 'real', style2D: 'layers', colors: {}, rcolors: {}, explode: 0, section: { axis: 'off', pos: 0.5 },
+  board: null, flipped: false, is2D: true, theme: 'auto', bg: 'theme',
+  meas: { on: false, pts: [], hover: null },
 };
+const L = k => state.layers[k] || (state.layers[k] = DEF_LAYER(k));
 const MASKS = [['#1d5a2c', 'Green'], ['#8f1f1f', 'Red'], ['#1d3f8f', 'Blue'], ['#151515', 'Black'], ['#efefef', 'White'], ['#4b2a73', 'Purple'], ['#d7b81c', 'Yellow']];
 const FINISH = { enig: '#d1a85a', hasl: '#c9ccd1', copper: '#c27a45' };
+const COPPER_RAW = '#c27a45';
 const FR4 = '#b8a46e';
+// Colours for the Layer colors style; each can be changed from the Layers list
+const DEFCOL = Object.assign(Object.fromEntries(Object.entries(TYPES).map(([k, v]) => [k, v.color])), { board: '#1c2026', holes: '#0b0c0e' });
+const LCOL = k => state.colors[k] || DEFCOL[k] || '#888888';
+const curStyle = () => state.is2D ? state.style2D : state.style3D;
+// Realistic colours: start from the Appearance settings, and each layer can be overridden from the Layers list
+function RDEF(k) {
+  if (/copper$/.test(k)) return FINISH[state.finish];
+  if (/mask$/.test(k)) return state.mask;
+  if (/silk$/.test(k)) return state.silk;
+  if (/paste$/.test(k)) return '#b9bcc1';
+  return { inner: COPPER_RAW, holes: '#16181c', board: FR4 }[k];
+}
+const RCOL = k => state.rcolors[k] || RDEF(k) || LCOL(k);
+const PCOL = k => isLayers() ? LCOL(k) : RCOL(k);          // colour of a layer in the current style
+const palette = () => isLayers() ? state.colors : state.rcolors;
+const isLayers = () => curStyle() === 'layers';
+
+const STORE = 'gerber3d.settings.v2';
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE) || 'null'); if (!s) return;
+    for (const k of ['mask', 'finish', 'silk', 'thick', 'boardOpacity', 'style3D', 'style2D', 'theme', 'bg', 'is2D']) if (s[k] != null) state[k] = s[k];
+    if (s.style && !s.style3D) state.style3D = s.style;
+    if (s.colors && typeof s.colors === 'object') state.colors = s.colors;
+    if (s.rcolors && typeof s.rcolors === 'object') state.rcolors = s.rcolors;
+    if (s.layers && typeof s.layers === 'object') state.layers = s.layers;
+  } catch { /* storage unavailable */ }
+}
+function saveSettings() {
+  try {
+    localStorage.setItem(STORE, JSON.stringify({ mask: state.mask, finish: state.finish, silk: state.silk, thick: state.thick,
+      boardOpacity: state.boardOpacity, style3D: state.style3D, style2D: state.style2D, colors: state.colors, rcolors: state.rcolors, is2D: state.is2D, theme: state.theme, bg: state.bg, layers: state.layers }));
+  } catch { /* storage unavailable */ }
+}
+loadSettings();
 
 /* ---------- Three.js scene ---------- */
 const viewEl = document.getElementById('view');
@@ -765,54 +1103,113 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
+renderer.localClippingEnabled = true;
 viewEl.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#e8e9ed');
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 5000);
-camera.position.set(0, 60, 60);
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; controls.dampingFactor = 0.09; controls.screenSpacePanning = true;
+
+const persp = new THREE.PerspectiveCamera(32, 1, 0.1, 5000);
+persp.position.set(0, 60, 60);
+const ortho = new THREE.OrthographicCamera(-20, 20, 20, -20, 0.1, 20000);
+let cam = persp, orthoHalf = 20;
+const controls = new OrbitControls(cam, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.09; controls.screenSpacePanning = true; controls.zoomToCursor = true;
 // Lights travel with the camera so every side of the board is lit the same way
-scene.add(camera);
-const lightTarget = new THREE.Object3D(); lightTarget.position.set(0, 0, -1); camera.add(lightTarget);
-const key = new THREE.DirectionalLight(0xffffff, 1.5); key.position.set(-0.6, 0.8, 0.4); key.target = lightTarget; camera.add(key);
-const fill = new THREE.DirectionalLight(0xffffff, 0.45); fill.position.set(0.8, -0.3, 0.3); fill.target = lightTarget; camera.add(fill);
+function lightRig(c) {
+  scene.add(c);
+  const tgt = new THREE.Object3D(); tgt.position.set(0, 0, -1); c.add(tgt);
+  const key = new THREE.DirectionalLight(0xffffff, 1.5); key.position.set(-0.6, 0.8, 0.4); key.target = tgt; c.add(key);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.45); fill.position.set(0.8, -0.3, 0.3); fill.target = tgt; c.add(fill);
+}
+lightRig(persp); lightRig(ortho);
 scene.add(new THREE.AmbientLight(0xffffff, 0.35));
 const boardRoot = new THREE.Group(); scene.add(boardRoot);
 const maxTex = Math.min(renderer.capabilities.maxTextureSize, 4096);
+const maxAniso = renderer.capabilities.getMaxAnisotropy();
+const board = () => boardRoot.children[0] || null;
+
+const clipPlanes = [];
+const clip = m => { m.clippingPlanes = clipPlanes; return m; };
+const HIDDEN = new THREE.MeshBasicMaterial({ visible: false });
 
 function resize() {
   const w = viewEl.clientWidth, h = viewEl.clientHeight; if (!w || !h) return;
-  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  renderer.setSize(w, h, false);
+  const a = w / h;
+  persp.aspect = a; persp.updateProjectionMatrix();
+  ortho.left = -orthoHalf * a; ortho.right = orthoHalf * a; ortho.top = orthoHalf; ortho.bottom = -orthoHalf; ortho.updateProjectionMatrix();
 }
 new ResizeObserver(resize).observe(viewEl); resize();
 
+const mlabel = document.getElementById('mlabel');
+const tmpV = new THREE.Vector3();
 let tween = null;
 function animate(t) {
   requestAnimationFrame(animate);
   if (tween) {
     const k = Math.min(1, (t - tween.t0) / 550), e = 1 - Math.pow(1 - k, 3);
-    camera.position.lerpVectors(tween.p0, tween.p1, e);
+    cam.position.lerpVectors(tween.p0, tween.p1, e);
     controls.target.lerpVectors(tween.c0, tween.c1, e);
-    camera.up.lerpVectors(tween.u0, tween.u1, e).normalize();
+    cam.up.lerpVectors(tween.u0, tween.u1, e).normalize();
     if (k >= 1) tween = null;
   }
-  controls.update(); renderer.render(scene, camera);
+  controls.update();
+  const g = board();
+  if (g) {
+    // Draw layers back to front relative to the camera so transparency stacks correctly
+    g.updateMatrixWorld(); tmpV.copy(cam.position); g.worldToLocal(tmpV);
+    const s = tmpV.z >= 0 ? 1 : -1;
+    for (const o of g.children) if (!o.userData.helper) o.renderOrder = s * (o.position.z + (o.userData.zoff || 0));
+    placeMeasureLabel(g);
+  }
+  renderer.render(scene, cam);
 }
 requestAnimationFrame(animate);
 
 function setView(kind, instant) {
-  const b = state.board; const size = b ? Math.max(b.w, b.h) : 40;
-  const dist = size / (2 * Math.tan(camera.fov * Math.PI / 360)) * 1.35 / Math.min(1, camera.aspect);
+  const b = state.board; const bw = b ? b.w : 40, bh = b ? b.h : 40, size = Math.max(bw, bh);
+  const aspect = (viewEl.clientWidth || 1) / (viewEl.clientHeight || 1);
   let dir, up = new THREE.Vector3(0, 1, 0);
   if (kind === 'top') { dir = new THREE.Vector3(0, 1, 0); up = new THREE.Vector3(0, 0, -1); }
   else if (kind === 'bottom') { dir = new THREE.Vector3(0, -1, 0); up = new THREE.Vector3(0, 0, -1); }
   else dir = new THREE.Vector3(-0.35, 1.1, 0.95).normalize();
+  let dist;
+  if (cam.isOrthographicCamera) {
+    orthoHalf = Math.max(bh / 2, bw / 2 / aspect) * 1.12;
+    cam.zoom = 1; resize(); dist = size * 3 + 50; instant = true;
+  } else dist = size / (2 * Math.tan(cam.fov * Math.PI / 360)) * 1.35 / Math.min(1, cam.aspect);
   const p1 = dir.multiplyScalar(dist);
-  if (instant) { camera.position.copy(p1); controls.target.set(0, 0, 0); camera.up.copy(up); return; }
-  tween = { t0: performance.now(), p0: camera.position.clone(), p1, c0: controls.target.clone(), c1: new THREE.Vector3(), u0: camera.up.clone(), u1: up };
+  if (instant) { tween = null; cam.position.copy(p1); controls.target.set(0, 0, 0); cam.up.copy(up); cam.lookAt(0, 0, 0); return; }
+  tween = { t0: performance.now(), p0: cam.position.clone(), p1, c0: controls.target.clone(), c1: new THREE.Vector3(), u0: cam.up.clone(), u1: up };
+}
+
+let side2D = 'top';
+// Underlines the current view button (Iso / Top / Bottom); orbiting by hand clears it in 3D
+function markView(v) { document.querySelectorAll('.toolbar [data-view]').forEach(b => b.classList.toggle('current', b.dataset.view === v)); }
+controls.addEventListener('start', () => { if (!state.is2D && !tween) markView(null); });
+function set2D(on, init) {
+  const styleBefore = curStyle();
+  state.is2D = on;
+  if (!init) {
+    syncStyleSel(); saveSettings();
+    if (curStyle() !== styleBefore) { renderLayers(); restyle(); }
+  }
+  cam = on ? ortho : persp;
+  controls.object = cam;
+  controls.enableRotate = !on;
+  controls.mouseButtons = on
+    ? { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }
+    : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+  controls.touches = on ? { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN } : { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+  document.querySelectorAll('.seg [data-mode]').forEach(b => b.setAttribute('aria-checked', (b.dataset.mode === '2d') === on));
+  document.body.classList.toggle('mode2d', on);
+  markView(on ? side2D : 'iso');
+  document.getElementById('hint').textContent = on
+    ? '2D · drag to pan · scroll to zoom · M to measure · 3 for 3D'
+    : '3D · drag to rotate · right-drag to pan · scroll to zoom · M to measure · 2 for 2D';
+  setView(on ? side2D : 'iso', true);
 }
 
 /* ---------- Build board ---------- */
@@ -820,11 +1217,11 @@ function layersOf(type) { return state.files.filter(f => f.type === type && f.pa
 function opsOf(type) { return layersOf(type).flatMap(f => f.parsed.ops || []); }
 
 function parseFile(f) {
-  const kind = (f.type === 'drill' || f.type === 'drill-npth') ? 'excellon' : f.type === 'ignore' ? null : 'gerber';
+  const kind = (f.type === 'drill' || f.type === 'drill-npth') ? 'excellon' : f.type === 'pnp' ? 'pnp' : f.type === 'ignore' ? null : 'gerber';
   if (!kind) { f.parsed = null; f.err = null; return; }
   if (f.parsed && f.parsedAs === kind) return;
   try {
-    f.parsed = kind === 'excellon' ? parseExcellon(f.text, f.name) : parseGerber(f.text);
+    f.parsed = kind === 'excellon' ? parseExcellon(f.text, f.name) : kind === 'pnp' ? parsePnP(f.text, f.name) : parseGerber(f.text);
     f.parsedAs = kind; f.err = null;
   } catch (e) { f.parsed = null; f.err = e.message || String(e); }
 }
@@ -845,6 +1242,27 @@ function collectHoles() {
   return holes.filter(h => h.d > 0.01);
 }
 
+// Pad and hole centres: these sit on the real board, unlike stray text or drawing frames
+function padPoints() {
+  const pts = [];
+  for (const t of ['top-copper', 'bottom-copper', 'top-mask', 'bottom-mask']) for (const o of opsOf(t)) if (o.t === 'flash' && o.dark) pts.push([o.x, o.y]);
+  for (const h of collectHoles()) pts.push([h.x, h.y]);
+  return pts;
+}
+
+// Explains files that are loaded but not drawn
+function ignoreHint(name, binary) {
+  const n = name.toLowerCase();
+  if (/\.drl$/.test(n) && binary) return 'Binary EIA drill file — not readable. Load the ASCII NC drill file (.TXT) from the same export instead.';
+  if (binary) return 'Binary file — not a Gerber or drill file.';
+  if (/\.drr$/.test(n)) return 'Drill report — not needed.';
+  if (/\.apr$/.test(n)) return 'Aperture list — not needed (RS-274X files carry their own apertures).';
+  if (/\.(gpt|gpb)$/.test(n)) return 'Altium pad master — not needed.';
+  if (/\.(gm\d+|gd\d+|gg\d+)$/.test(n)) return 'Mechanical / drawing layer — set its type to Outline if it holds the board shape.';
+  if (/\.(rep|ree|ldp|extrep|txt|csv)$/.test(n)) return 'Report or text file — not rendered.';
+  return 'Not rendered';
+}
+
 function holePolygon(h, cx, cy) {
   const r = h.d / 2, n = Math.max(16, Math.min(64, Math.round(r * 40)));
   if (h.x2 == null || Math.hypot(h.x2 - h.x, h.y2 - h.y) < 1e-6) {
@@ -859,7 +1277,7 @@ function holePolygon(h, cx, cy) {
 
 function tinted(src, color, scratch) {
   const c = scratch || makeCanvas(src.width, src.height), x = c.getContext('2d');
-  x.globalCompositeOperation = 'source-over'; x.clearRect(0, 0, c.width, c.height);
+  x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.clearRect(0, 0, c.width, c.height);
   x.fillStyle = color; x.fillRect(0, 0, c.width, c.height);
   x.globalCompositeOperation = 'destination-in'; x.drawImage(src, 0, 0);
   x.globalCompositeOperation = 'source-over';
@@ -871,50 +1289,90 @@ function mixHex(a, b, t) {
   const A = ch(pa), B = ch(pb);
   return 'rgb(' + A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',') + ')';
 }
+const put = (ctx, src, a) => { if (a <= 0) return; ctx.globalAlpha = Math.min(1, a); ctx.drawImage(src, 0, 0); ctx.globalAlpha = 1; };
+const clipTo = (canvas, mask, op) => { const x = canvas.getContext('2d'); x.globalCompositeOperation = op; x.drawImage(mask, 0, 0); x.globalCompositeOperation = 'source-over'; return canvas; };
 
 let built = null; // geometry/raster cache for appearance-only updates
+const compCache = new Map(), geoCache = new Map();
+function disposeMat(m) { if (!m) return; m.map?.dispose(); m.roughnessMap?.dispose(); m.dispose(); }
+function clearCaches() {
+  for (const m of compCache.values()) disposeMat(m); compCache.clear();
+  for (const g of geoCache.values()) g.dispose(); geoCache.clear();
+}
+function disposeBuild() { if (built?.disp) for (const x of built.disp) x.dispose?.(); if (built) built.disp = []; }
+
+function rasterOf(t) {
+  if (!built) return null;
+  if (t in built.raster) return built.raster[t];
+  const ops = opsOf(t); let c = null;
+  if (ops.length) { c = makeCanvas(built.view.W, built.view.H); renderOps(c.getContext('2d'), ops, built.view); }
+  return built.raster[t] = c;
+}
+function innerRaster(i) {
+  const r = built.inners[i];
+  if (!r.c) { r.c = makeCanvas(built.view.W, built.view.H); renderOps(r.c.getContext('2d'), r.f.parsed.ops, built.view); }
+  return r.c;
+}
 
 function buildBoard() {
   for (const f of state.files) parseFile(f);
+  disposeBuild();
   boardRoot.clear();
+  clearCaches();
+  state.meas.pts = []; state.meas.hover = null;
   const hasAny = state.files.some(f => f.parsed && f.type !== 'ignore');
   document.getElementById('empty').style.display = hasAny ? 'none' : 'flex';
-  if (!hasAny) { state.board = null; built = null; updateInfo(); return; }
+  if (!hasAny) { state.board = null; built = null; updateInfo(); renderLayers(); renderMeasureInfo([]); return; }
 
   // ---- outline
-  let outer = null, cutouts = [];
-  const oSegs = outlineSegments(opsOf('outline'));
-  const loops = chainLoops(oSegs).map(p => ({ p, a: Math.abs(polyArea(p)) })).sort((a, b) => b.a - a.a);
-  if (loops.length) {
-    outer = loops[0].p;
-    for (const l of loops.slice(1)) {
-      if (l.a > loops[0].a * 0.95) continue;
-      if (pip(l.p[0], outer) && !cutouts.some(c => pip(l.p[0], c))) cutouts.push(l.p);
+  let outer = null, cutouts = [], outlineFrom = '', ignoredShapes = 0;
+  // Closed loops from every outline-type file, remembering which file each came from
+  const loops = layersOf('outline').flatMap(f => chainLoops(outlineSegments(f.parsed.ops)).map(p => ({ p, a: Math.abs(polyArea(p)), f: f.name })));
+  // Pads and holes mark where the real board is. CAD exports often put other closed shapes on
+  // outline/mechanical layers (Altium drawing frames, title blocks, text), so the outline is the
+  // smallest loop that encloses the pads, not simply the largest one.
+  const pads = padPoints();
+  const sample = pads.length > 300 ? pads.filter((_, i) => i % Math.ceil(pads.length / 300) === 0) : pads;
+  let outerL = null;
+  if (sample.length && loops.length) {
+    const need = Math.max(1, Math.ceil(sample.length * 0.9));
+    const fits = loops.filter(l => { let n = 0; for (const q of sample) if (pip(q, l.p)) n++; return n >= need; }).sort((x, y) => x.a - y.a);
+    outerL = fits[0] || null;
+  }
+  if (!outerL && loops.length) outerL = loops.slice().sort((x, y) => y.a - x.a)[0];
+  if (outerL) {
+    outer = outerL.p; outlineFrom = outerL.f;
+    for (const l of loops) {
+      if (l === outerL) continue;
+      if (l.a < outerL.a * 0.95 && pip(l.p[0], outer) && !cutouts.some(c => pip(l.p[0], c))) cutouts.push(l.p);
+      else if (l.a > outerL.a) ignoredShapes++;
     }
   }
   let b;
   if (outer) b = polyBounds(outer);
   else {
     b = [Infinity, Infinity, -Infinity, -Infinity];
-    for (const t of ['top-copper', 'bottom-copper', 'top-mask', 'bottom-mask', 'top-silk', 'bottom-silk', 'outline', 'inner']) {
+    if (pads.length) {
+      // No outline: frame the pads and holes, so stray text (e.g. Altium layer names) can't stretch the board
+      for (const o of ['top-copper', 'bottom-copper', 'top-mask', 'bottom-mask'].flatMap(t => opsOf(t))) if (o.t === 'flash' && o.dark) {
+        const r = apSize(o.ap) * opScale(o) / 2; b = [Math.min(b[0], o.x - r), Math.min(b[1], o.y - r), Math.max(b[2], o.x + r), Math.max(b[3], o.y + r)];
+      }
+    } else for (const t of ['top-copper', 'bottom-copper', 'top-mask', 'bottom-mask', 'top-silk', 'bottom-silk', 'outline', 'inner']) {
       const ob = opsBounds(opsOf(t)); b = [Math.min(b[0], ob[0]), Math.min(b[1], ob[1]), Math.max(b[2], ob[2]), Math.max(b[3], ob[3])];
     }
     for (const h of collectHoles()) { b[0] = Math.min(b[0], h.x - h.d); b[1] = Math.min(b[1], h.y - h.d); b[2] = Math.max(b[2], h.x + h.d); b[3] = Math.max(b[3], h.y + h.d); }
-    if (!isFinite(b[0])) { state.board = null; updateInfo(); return; }
+    if (!isFinite(b[0])) { state.board = null; built = null; updateInfo(); renderLayers(); return; }
     b = [b[0] - 1, b[1] - 1, b[2] + 1, b[3] + 1];
     outer = [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]];
   }
   const W = b[2] - b[0], H = b[3] - b[1], cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
-  state.board = { w: W, h: H, hasOutline: loops.length > 0, cutouts: cutouts.length };
+  state.board = { w: W, h: H, hasOutline: !!outerL, outlineFrom, ignoredShapes, cutouts: cutouts.length };
 
-  // ---- raster view
+  // ---- raster view (layers are rasterised on first use)
   const s = Math.min(maxTex / Math.max(W, H), 120);
   const view = { minX: b[0], maxY: b[3], s, W: Math.max(4, Math.round(W * s)), H: Math.max(4, Math.round(H * s)) };
-  const raster = {};
-  for (const t of ['top-copper', 'top-mask', 'top-silk', 'bottom-copper', 'bottom-mask', 'bottom-silk']) {
-    const ops = opsOf(t); if (!ops.length) continue;
-    const c = makeCanvas(view.W, view.H); renderOps(c.getContext('2d'), ops, view); raster[t] = c;
-  }
+  const innerNo = f => { const m = (f.parsed.attrs?.FileFunction || '').match(/Copper,L(\d+)/i) || f.name.match(/in(\d+)/i) || f.name.match(/\.g(?:p)?(\d+)$/i); return m ? +m[1] : 999; };
+  const inners = layersOf('inner').sort((x, y) => innerNo(x) - innerNo(y) || x.name.localeCompare(y.name)).map(f => ({ f, c: null }));
 
   // ---- holes: which can be cut into the geometry
   const holes = collectHoles();
@@ -939,158 +1397,607 @@ function buildBoard() {
     else painted.push(h);
   }
 
-  built = { view, raster, outer, cutouts, cut, painted, cx, cy, b, W, H };
+  // ---- components from pick-and-place files
+  const comps = [];
+  for (const f of layersOf('pnp')) {
+    const fit = fitComps(f.parsed.comps.map(c => ({ ...c })), b, f.parsed.unitExplicit);
+    f.note = fit.note; comps.push(...fit.comps);
+  }
+  for (const c of comps) c.size = pkgSize(c.pkg, c.ref);
+
+  // ---- snap targets for the measure tool: hole centres and pad centres
+  const snap = new Map();
+  const addS = (x, y) => { const k = Math.floor(x) + ',' + Math.floor(y); (snap.get(k) || snap.set(k, []).get(k)).push([x, y]); };
+  for (const h of holes) { addS(h.x, h.y); if (h.x2 != null) addS(h.x2, h.y2); }
+  for (const t of ['top-copper', 'bottom-copper']) for (const o of opsOf(t)) if (o.t === 'flash' && o.dark) addS(o.x, o.y);
+  for (const c of comps) addS(c.x, c.y);
+
+  built = { view, raster: {}, inners, outer, cutouts, cut, painted, holes, comps, snap, cx, cy, b, W, H, disp: [] };
   buildGeometry();
-  updateInfo(holes.length);
+  updateInfo();
+  renderLayers();
 }
 
-function composeSide(side) {
-  const { view, raster, painted } = built;
-  const cu = state.show.cu ? raster[side + '-copper'] : null;
-  const mask = raster[side + '-mask'];
-  const silk = state.show.silk ? raster[side + '-silk'] : null;
-  const maskOn = state.show.mask && !!mask;
-  const finish = FINISH[state.finish];
-  const col = makeCanvas(view.W, view.H), cx = col.getContext('2d');
-  const pbr = makeCanvas(view.W, view.H), px = pbr.getContext('2d');   // R=bump, G=roughness, B=metalness
-  const tmp = makeCanvas(view.W, view.H), tmp2 = makeCanvas(view.W, view.H);
+function paintHoles(ctx, color) {
+  const { view, painted } = built;
+  if (!L('holes').on || !painted.length) return;
+  ctx.setTransform(view.s, 0, 0, -view.s, -view.minX * view.s, view.maxY * view.s);
+  ctx.fillStyle = color; ctx.strokeStyle = color; ctx.lineCap = 'round';
+  // On a see-through board, holes are cut out of the surface instead of painted dark
+  if (ctx.canvas.dataset.alpha) ctx.globalCompositeOperation = 'destination-out';
+  for (const h of painted) {
+    if (h.x2 != null) { ctx.lineWidth = h.d; ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.lineTo(h.x2, h.y2); ctx.stroke(); }
+    else { ctx.beginPath(); ctx.arc(h.x, h.y, h.d / 2, 0, TAU); ctx.fill(); }
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
 
+function texture(canvas, srgb) {
+  const t = new THREE.CanvasTexture(canvas); t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  t.anisotropy = maxAniso; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter;
+  return t;
+}
+
+// Realistic surface: colour texture plus a packed PBR texture (R = bump, G = roughness, B = metalness)
+function composeSide(side) {
+  const { view } = built, Wp = view.W, Hp = view.H;
+  const lc = L(side + '-copper'), lm = L(side + '-mask'), ls = L(side + '-silk'), lp = L(side + '-paste');
+  const cu = lc.on ? rasterOf(side + '-copper') : null;
+  const mask = rasterOf(side + '-mask');
+  const maskOn = lm.on && !!mask;
+  const silk = ls.on ? rasterOf(side + '-silk') : null;
+  const paste = lp.on ? rasterOf(side + '-paste') : null;
+  const finish = RCOL(side + '-copper'), maskC = RCOL(side + '-mask');
+  const col = makeCanvas(Wp, Hp), c1 = col.getContext('2d');
+  const pbr = makeCanvas(Wp, Hp), p1 = pbr.getContext('2d');
+  const t1 = makeCanvas(Wp, Hp), t2 = makeCanvas(Wp, Hp);
+
+  // Substrate: its opacity lives in the texture alpha so copper, mask and silk stay solid on a see-through board
+  const sub = subOpacity();
+  if (sub < 0.999) col.dataset.alpha = '1';
+  c1.globalAlpha = sub; c1.fillStyle = RCOL('board'); c1.fillRect(0, 0, Wp, Hp); c1.globalAlpha = 1;
+  p1.fillStyle = 'rgb(0,200,0)'; p1.fillRect(0, 0, Wp, Hp);
+  if (cu) { put(c1, tinted(cu, maskOn ? RCOL('inner') : finish, t1), lc.a); put(p1, tinted(cu, 'rgb(150,70,255)', t1), lc.a); }
   if (maskOn) {
-    cx.fillStyle = state.mask; cx.fillRect(0, 0, view.W, view.H);
-    px.fillStyle = 'rgb(0,120,0)'; px.fillRect(0, 0, view.W, view.H);
+    // Mask colour with copper relief showing through; openings cut away
+    const cover = (base, relief, target) => {
+      const c2 = t2.getContext('2d');
+      c2.globalCompositeOperation = 'source-over'; c2.globalAlpha = 1; c2.clearRect(0, 0, Wp, Hp);
+      c2.fillStyle = base; c2.fillRect(0, 0, Wp, Hp);
+      if (cu) put(c2, tinted(cu, relief, t1), lc.a);
+      clipTo(t2, mask, 'destination-out');
+      put(target, t2, lm.a);
+    };
+    cover(maskC, mixHex(maskC, '#ffffff', /^#(e|f)/i.test(maskC) ? 0 : 0.16), c1);
+    cover('rgb(0,120,0)', 'rgb(150,110,0)', p1);
     if (cu) {
-      cx.drawImage(tinted(cu, mixHex(state.mask, '#ffffff', state.mask === '#efefef' ? 0 : 0.16), tmp), 0, 0);
-      px.drawImage(tinted(cu, 'rgb(150,110,0)', tmp), 0, 0);
+      put(c1, clipTo(tinted(cu, finish, t1), mask, 'destination-in'), lc.a);
+      put(p1, clipTo(tinted(cu, state.finish === 'hasl' ? 'rgb(170,95,255)' : 'rgb(170,70,255)', t1), mask, 'destination-in'), lc.a);
     }
-    // Openings: bare laminate, then finished copper
-    cx.drawImage(tinted(mask, FR4, tmp), 0, 0);
-    px.drawImage(tinted(mask, 'rgb(20,200,0)', tmp), 0, 0);
-    if (cu) {
-      const ex = tinted(cu, finish, tmp); const ec = ex.getContext('2d');
-      ec.globalCompositeOperation = 'destination-in'; ec.drawImage(mask, 0, 0); ec.globalCompositeOperation = 'source-over';
-      cx.drawImage(ex, 0, 0);
-      const ep = tinted(cu, state.finish === 'hasl' ? 'rgb(170,95,255)' : 'rgb(170,70,255)', tmp2); const epc = ep.getContext('2d');
-      epc.globalCompositeOperation = 'destination-in'; epc.drawImage(mask, 0, 0); epc.globalCompositeOperation = 'source-over';
-      px.drawImage(ep, 0, 0);
-    }
-  } else {
-    cx.fillStyle = FR4; cx.fillRect(0, 0, view.W, view.H);
-    px.fillStyle = 'rgb(0,200,0)'; px.fillRect(0, 0, view.W, view.H);
-    if (cu) { cx.drawImage(tinted(cu, finish, tmp), 0, 0); px.drawImage(tinted(cu, 'rgb(150,70,255)', tmp), 0, 0); }
   }
+  if (paste) { put(c1, tinted(paste, RCOL(side + '-paste'), t1), lp.a); put(p1, tinted(paste, 'rgb(40,150,200)', t1), lp.a); }
   if (silk) {
-    const sc = tinted(silk, state.silk, tmp), scx = sc.getContext('2d');
-    if (maskOn) { scx.globalCompositeOperation = 'destination-out'; scx.drawImage(mask, 0, 0); scx.globalCompositeOperation = 'source-over'; }
-    cx.drawImage(sc, 0, 0);
-    const sp = tinted(silk, 'rgb(215,235,0)', tmp2), spx = sp.getContext('2d');
-    if (maskOn) { spx.globalCompositeOperation = 'destination-out'; spx.drawImage(mask, 0, 0); spx.globalCompositeOperation = 'source-over'; }
-    px.drawImage(sp, 0, 0);
+    const sc = tinted(silk, RCOL(side + '-silk'), t1); if (maskOn) clipTo(sc, mask, 'destination-out'); put(c1, sc, ls.a);
+    const sp = tinted(silk, 'rgb(215,235,0)', t1); if (maskOn) clipTo(sp, mask, 'destination-out'); put(p1, sp, ls.a);
   }
-  // Holes that could not be cut into the geometry are painted flat
-  if (state.show.holes && painted.length) {
-    const T = [view.s, 0, 0, -view.s, -view.minX * view.s, view.maxY * view.s];
-    for (const [c, colr] of [[cx, '#16181c'], [px, 'rgb(0,230,0)']]) {
-      c.setTransform(...T); c.fillStyle = colr; c.strokeStyle = colr; c.lineCap = 'round';
-      for (const h of painted) {
-        if (h.x2 != null) { c.lineWidth = h.d; c.beginPath(); c.moveTo(h.x, h.y); c.lineTo(h.x2, h.y2); c.stroke(); }
-        else { c.beginPath(); c.arc(h.x, h.y, h.d / 2, 0, TAU); c.fill(); }
-      }
-      c.setTransform(1, 0, 0, 1, 0, 0);
-    }
-  }
-  const map = new THREE.CanvasTexture(col); map.colorSpace = THREE.SRGBColorSpace;
-  const pt = new THREE.CanvasTexture(pbr); pt.colorSpace = THREE.NoColorSpace;
-  for (const t of [map, pt]) { t.anisotropy = renderer.capabilities.getMaxAnisotropy(); t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; }
+  paintHoles(c1, RCOL('holes')); paintHoles(p1, 'rgb(0,230,0)');
+  const map = texture(col, true), pt = texture(pbr, false);
   return new THREE.MeshStandardMaterial({
     map, roughnessMap: pt, metalnessMap: pt, bumpMap: pt, bumpScale: 1.6,
     roughness: 1, metalness: 1, envMapIntensity: 1.0,
   });
 }
 
-function buildGeometry() {
-  if (!built) return;
-  boardRoot.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) [].concat(o.material).forEach(m => { m.map?.dispose(); m.roughnessMap?.dispose(); m.dispose(); }); });
-  boardRoot.clear();
-  const { outer, cutouts, cut, cx, cy, b, W, H } = built;
-  const t = state.thick;
+// Classic Gerber-viewer look: every layer in its own colour, unlit
+const LMULT = { copper: 0.85, mask: 0.5, paste: 0.6, silk: 1, inner: 0.55 };
+function composeLayers(side) {
+  const { view, outer, cutouts } = built, Wp = view.W, Hp = view.H;
+  const col = makeCanvas(Wp, Hp), c1 = col.getContext('2d'), t1 = makeCanvas(Wp, Hp);
+  const sub = subOpacity();
+  if (sub < 0.999) col.dataset.alpha = '1';
+  c1.globalAlpha = sub; c1.fillStyle = LCOL('board'); c1.fillRect(0, 0, Wp, Hp); c1.globalAlpha = 1;
+  const other = side === 'top' ? 'bottom' : 'top';
+  const draw = (k, dim) => { const l = L(k); if (!l.on) return; const r = rasterOf(k); if (!r) return; put(c1, tinted(r, LCOL(k), t1), l.a * LMULT[k.split('-')[1]] * dim); };
+  for (const k of ['silk', 'paste', 'mask', 'copper']) draw(other + '-' + k, 0.45);
+  if (L('inner').on) {
+    const n = built.inners.length, idx = [...Array(n).keys()];
+    for (const i of side === 'top' ? idx.reverse() : idx) put(c1, tinted(innerRaster(i), LCOL('inner'), t1), L('inner').a * LMULT.inner);
+  }
+  for (const k of ['copper', 'mask', 'paste', 'silk']) draw(side + '-' + k, 1);
+  c1.setTransform(view.s, 0, 0, -view.s, -view.minX * view.s, view.maxY * view.s);
+  c1.strokeStyle = LCOL('outline'); c1.lineWidth = 2.5 / view.s; c1.lineJoin = 'round';
+  if (L('outline').on) for (const p of [outer, ...cutouts]) { polyPath(c1, p); c1.stroke(); }
+  c1.setTransform(1, 0, 0, 1, 0, 0);
+  paintHoles(c1, LCOL('holes'));
+  return new THREE.MeshBasicMaterial({ map: texture(col, true), toneMapped: false });
+}
+
+function sideMaterial(side) {
+  const lay = Object.fromEntries(Object.entries(state.layers).filter(([k]) => isLayers() || k.startsWith(side) || k === 'holes'));
+  const key = JSON.stringify([side, curStyle(), state.mask, state.finish, state.silk, lay, subOpacity(), isLayers() ? state.colors : state.rcolors]);
+  if (compCache.has(key)) { const m = compCache.get(key); compCache.delete(key); compCache.set(key, m); return m; }
+  const m = isLayers() ? composeLayers(side) : composeSide(side);
+  compCache.set(key, m);
+  while (compCache.size > 6) { const [k, old] = compCache.entries().next().value; compCache.delete(k); disposeMat(old); }
+  return m;
+}
+
+function boardShape(withHoles) {
+  const { outer, cutouts, cut, cx, cy } = built;
   const toV = p => new THREE.Vector2(p[0] - cx, p[1] - cy);
   const shape = new THREE.Shape(outer.map(toV));
   for (const c of cutouts) shape.holes.push(new THREE.Path(c.map(toV)));
-  const useHoles = state.show.holes ? cut : [];
-  for (const h of useHoles) shape.holes.push(new THREE.Path(holePolygon(h, cx, cy)));
-  let geo;
-  try { geo = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false, curveSegments: 1 }); }
-  catch (e) { console.warn('Triangulation failed, retrying without holes', e); shape.holes = cutouts.map(c => new THREE.Path(c.map(toV))); geo = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false, curveSegments: 1 }); }
-
-  // UVs from board coordinates; split caps into top/bottom groups
-  const pos = geo.attributes.position, uv = geo.attributes.uv;
+  if (withHoles) for (const h of cut) shape.holes.push(new THREE.Path(holePolygon(h, cx, cy)));
+  return shape;
+}
+function boardUV(geo) {
+  const { cx, cy, b, W, H } = built, pos = geo.attributes.position, uv = geo.attributes.uv;
   for (let i = 0; i < pos.count; i++) uv.setXY(i, (pos.getX(i) + cx - b[0]) / W, (pos.getY(i) + cy - b[1]) / H);
   uv.needsUpdate = true;
-  const groups = geo.groups.slice(); geo.clearGroups();
-  for (const g of groups) {
-    if (g.materialIndex !== 0) { geo.addGroup(g.start, g.count, 1); continue; }
-    let runStart = g.start, runMat = null;
-    for (let i = g.start; i < g.start + g.count; i += 3) {
-      const m = pos.getZ(i) > t / 2 ? 0 : 2;
-      if (runMat === null) runMat = m;
-      if (m !== runMat) { geo.addGroup(runStart, i - runStart, runMat); runStart = i; runMat = m; }
+}
+function cached(key, make) {
+  if (geoCache.has(key)) return geoCache.get(key);
+  const g = make(); geoCache.set(key, g);
+  if (geoCache.size > 6) { const [k, old] = geoCache.entries().next().value; geoCache.delete(k); old.dispose(); }
+  return g;
+}
+// Extruded board, groups: 0 = top cap, 1 = edge, 2 = bottom cap
+function substrateGeo(depth, withHoles) {
+  return cached(`slab|${depth}|${withHoles}`, () => {
+    let geo;
+    try { geo = new THREE.ExtrudeGeometry(boardShape(withHoles), { depth, bevelEnabled: false, curveSegments: 1 }); }
+    catch (e) { console.warn('Triangulation failed, retrying without holes', e); geo = new THREE.ExtrudeGeometry(boardShape(false), { depth, bevelEnabled: false, curveSegments: 1 }); }
+    boardUV(geo);
+    const pos = geo.attributes.position, groups = geo.groups.slice(); geo.clearGroups();
+    for (const g of groups) {
+      if (g.materialIndex !== 0) { geo.addGroup(g.start, g.count, 1); continue; }
+      let runStart = g.start, runMat = null;
+      for (let i = g.start; i < g.start + g.count; i += 3) {
+        const m = pos.getZ(i) > depth / 2 ? 0 : 2;
+        if (runMat === null) runMat = m;
+        if (m !== runMat) { geo.addGroup(runStart, i - runStart, runMat); runStart = i; runMat = m; }
+      }
+      if (runMat !== null) geo.addGroup(runStart, g.start + g.count - runStart, runMat);
     }
-    if (runMat !== null) geo.addGroup(runStart, g.start + g.count - runStart, runMat);
-  }
-  geo.computeVertexNormals();
+    geo.computeVertexNormals();
+    return geo;
+  });
+}
+function sheetGeo(withHoles) {
+  return cached(`sheet|${withHoles}`, () => {
+    let geo;
+    try { geo = new THREE.ShapeGeometry(boardShape(withHoles), 1); }
+    catch (e) { geo = new THREE.ShapeGeometry(boardShape(false), 1); }
+    boardUV(geo); return geo;
+  });
+}
 
-  const top = composeSide('top'), bot = composeSide('bottom');
-  const edge = new THREE.MeshStandardMaterial({ color: '#7a6c45', roughness: 0.85, metalness: 0 });
-  const mesh = new THREE.Mesh(geo, [top, edge, bot]);
-  mesh.position.z = -t / 2;
-
-  const g = new THREE.Group(); g.add(mesh);
-  // Plated barrels
-  const plated = useHoles.filter(h => h.plated && h.x2 == null);
-  if (plated.length) {
-    const cyl = new THREE.CylinderGeometry(1, 1, 1, 28, 1, true); cyl.rotateX(Math.PI / 2);
-    const mat = new THREE.MeshStandardMaterial({ color: state.finish === 'hasl' ? '#9da2a8' : '#a07a40', metalness: 1, roughness: 0.45, side: THREE.DoubleSide });
-    const im = new THREE.InstancedMesh(cyl, mat, plated.length), m4 = new THREE.Matrix4();
-    plated.forEach((h, i) => { const r = h.d / 2 - 0.004; m4.makeScale(r, r, t * 0.998); m4.setPosition(h.x - cx, h.y - cy, 0); im.setMatrixAt(i, m4); });
-    g.add(im);
+// A board slab rendered as three meshes (top cap, edge, bottom cap) so transparent layers sort correctly
+function addSlab(g, geo, mats, depth, z) {
+  const parts = [[[mats[0], HIDDEN, HIDDEN], depth, true], [[HIDDEN, mats[1], HIDDEN], depth / 2, false], [[HIDDEN, HIDDEN, mats[2]], 0, false]];
+  return parts.map(([arr, zoff, primary]) => {
+    const m = new THREE.Mesh(geo, arr);
+    Object.assign(m.userData, { substrate: true, primary, allMats: mats, depth, zoff });
+    m.position.z = z - depth / 2; g.add(m); g.userData.pick.push(m);
+    return m;
+  });
+}
+function sheetMesh(g, canvas, opacity, metal) {
+  const D = built.disp, tex = texture(canvas, true); D.push(tex);
+  const common = { map: tex, transparent: true, opacity, alphaTest: 0.03, side: THREE.DoubleSide, depthWrite: false };
+  const mat = isLayers()
+    ? new THREE.MeshBasicMaterial({ ...common, toneMapped: false })
+    : new THREE.MeshStandardMaterial({ ...common, metalness: metal ? 0.9 : 0, roughness: metal ? 0.35 : 0.6 });
+  clip(mat); D.push(mat);
+  const m = new THREE.Mesh(sheetGeo(L('holes').on), mat);
+  m.userData.sheet = true; g.add(m); g.userData.pick.push(m);
+  return m;
+}
+function sheetCanvas(key) {
+  if (!L(key).on) return null;
+  const r = rasterOf(key); if (!r) return null;
+  const layers = isLayers(), kind = key.split('-')[1];
+  const c = makeCanvas(r.width, r.height);
+  if (kind === 'mask') {
+    const x = c.getContext('2d'); x.fillStyle = PCOL(key); x.fillRect(0, 0, c.width, c.height);
+    return clipTo(c, r, 'destination-out');
   }
+  const color = PCOL(key);
+  return tinted(r, color, c);
+}
+const innerCanvas = i => tinted(innerRaster(i), PCOL('inner'), makeCanvas(built.view.W, built.view.H));
+
+function buildGeometry() {
+  if (!built) return;
+  disposeBuild();
+  boardRoot.clear();
+  const { cut, cx, cy } = built;
+  const t = state.thick, holesOn = L('holes').on, layers = isLayers();
+  const exploded = state.explode > 0.001;
+  const D = built.disp;
+  const g = new THREE.Group();
+  Object.assign(g.userData, { pick: [], boardMats: [], stack: [], compMeshes: [], innerSheets: [], exploded, surf: { top: t / 2, bot: -t / 2 } });
+  const edgeMat = clip(new THREE.MeshStandardMaterial({ color: mixHex(PCOL('board'), '#000000', 0.35), roughness: 0.85, metalness: 0 })); D.push(edgeMat);
+  g.userData.boardMats.push(edgeMat);
+  const nIn = L('inner').on ? built.inners.length : 0;
+
+  if (!exploded) {
+    const top = clip(sideMaterial('top')), bot = clip(sideMaterial('bottom'));
+    top.userData.cap = bot.userData.cap = true;
+    g.userData.boardMats.push(top, bot);
+    addSlab(g, substrateGeo(t, holesOn), [top, edgeMat, bot], t, 0);
+    for (let i = 0; i < nIn; i++) {
+      const sh = sheetMesh(g, innerCanvas(i), L('inner').a, !layers);
+      sh.position.z = t / 2 - t * (i + 1) / (nIn + 1);
+      g.userData.innerSheets.push(sh);
+    }
+    // Plated barrels
+    const plated = holesOn ? cut.filter(h => h.plated && h.x2 == null) : [];
+    if (plated.length) {
+      const cyl = new THREE.CylinderGeometry(1, 1, 1, 28, 1, true); cyl.rotateX(Math.PI / 2); D.push(cyl);
+      const mat = clip(new THREE.MeshStandardMaterial({ color: state.finish === 'hasl' ? '#9da2a8' : '#a07a40', metalness: 1, roughness: 0.45, side: THREE.DoubleSide }));
+      mat.userData.keepSide = mat.userData.solid = true; D.push(mat); g.userData.boardMats.push(mat);
+      const im = new THREE.InstancedMesh(cyl, mat, plated.length), m4 = new THREE.Matrix4();
+      plated.forEach((h, i) => { const r = h.d / 2 - 0.004; m4.makeScale(r, r, t * 0.998); m4.setPosition(h.x - cx, h.y - cy, 0); im.setMatrixAt(i, m4); });
+      g.add(im);
+    }
+  } else {
+    // Exploded stack: dielectric slabs between copper layers, other layers as separate sheets
+    const slabT = t / (nIn + 1), sgeo = substrateGeo(slabT, holesOn);
+    const fr = clip(new THREE.MeshStandardMaterial({ color: PCOL('board'), roughness: 0.8, metalness: 0 })); D.push(fr);
+    g.userData.boardMats.push(fr);
+    const items = [];
+    const sheetItem = key => { const c = sheetCanvas(key); if (c) items.push({ th: 0, objs: [sheetMesh(g, c, L(key).a, !layers && /copper|paste/.test(key))] }); };
+    for (const k of ['bottom-paste', 'bottom-silk', 'bottom-mask', 'bottom-copper']) sheetItem(k);
+    for (let s = 0; s <= nIn; s++) {
+      items.push({ th: slabT, objs: addSlab(g, sgeo, [fr, edgeMat, fr], slabT, 0) });
+      if (s < nIn) items.push({ th: 0, objs: [sheetMesh(g, innerCanvas(nIn - 1 - s), L('inner').a, !layers)] });
+    }
+    for (const k of ['top-copper', 'top-mask', 'top-silk', 'top-paste']) sheetItem(k);
+    g.userData.stack = items;
+  }
+
+  addComponents(g);
+  makeMeasureHelpers(g);
   g.rotation.x = -Math.PI / 2;
-  if (state.flipped) g.rotation.z = 0, g.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), Math.PI);
+  if (state.flipped) g.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), Math.PI);
   boardRoot.add(g);
+  layoutStack(g);
+  updateMaterials();
+  updateClipping();
+}
+
+function layoutStack(g) {
+  if (!g) return;
+  if (g.userData.exploded) {
+    const items = g.userData.stack, gap = state.explode * Math.max(built.W, built.H) * 0.1;
+    const total = items.reduce((s, it) => s + it.th, 0) + gap * Math.max(0, items.length - 1);
+    let z = -total / 2;
+    for (const it of items) {
+      const c = z + it.th / 2;
+      for (const o of it.objs) o.position.z = o.userData.depth != null ? c - o.userData.depth / 2 : c;
+      z += it.th + gap;
+    }
+    g.userData.surf = { top: total / 2, bot: -total / 2 };
+  }
+  for (const im of g.userData.compMeshes) im.position.z = im.userData.side === 'b' ? g.userData.surf.bot : g.userData.surf.top;
+  updateMeasureHelpers();
+}
+
+function addComponents(g) {
+  const comps = built.comps, lay = L('pnp');
+  if (!comps.length || !lay.on) return;
+  const D = built.disp, groups = new Map();
+  for (const c of comps) { const k = compColor(c) + '|' + (c.bottom ? 'b' : 't'); (groups.get(k) || groups.set(k, []).get(k)).push(c); }
+  const box = new THREE.BoxGeometry(1, 1, 1); D.push(box);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(), Z = new THREE.Vector3(0, 0, 1);
+  for (const [k, list] of groups) {
+    const [color, side] = k.split('|'), bot = side === 'b';
+    const mat = clip(new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: color === '#b9bcc2' ? 0.8 : 0.05 }));
+    mat.userData.comp = true; D.push(mat);
+    const im = new THREE.InstancedMesh(box, mat, list.length);
+    list.forEach((c, i) => {
+      const [lx, wy, hz] = c.size;
+      p.set(c.x - built.cx, c.y - built.cy, bot ? -hz / 2 : hz / 2);
+      q.setFromAxisAngle(Z, c.rot * Math.PI / 180); s.set(lx, wy, hz);
+      im.setMatrixAt(i, m4.compose(p, q, s));
+    });
+    Object.assign(im.userData, { comps: list, side, zoff: bot ? -0.5 : 0.5 });
+    g.add(im); g.userData.compMeshes.push(im);
+  }
+  setCompOpacity(g);
+}
+function setCompOpacity(g) {
+  const a = L('pnp').a, tr = a < 0.999;
+  for (const im of g.userData.compMeshes) { const m = im.material; if (m.transparent !== tr) m.needsUpdate = true; m.transparent = tr; m.opacity = a; m.depthWrite = !tr; }
+}
+
+// Effective board (substrate) opacity: the Board row's checkbox hides it completely
+const subOpacity = () => L('board').on ? Math.round(state.boardOpacity * 50) / 50 : 0;
+function updateMaterials() {
+  const g = board(); if (!g) return;
+  const op = subOpacity(), tr = op < 0.999, sec = state.section.axis !== 'off';
+  for (const m of g.userData.boardMats) {
+    if (!m.userData.solid) {
+      if (m.transparent !== tr) m.needsUpdate = true;
+      // Surface caps carry their transparency in the texture; edges and slabs use plain opacity
+      m.transparent = tr; m.opacity = m.userData.cap ? 1 : op; m.depthWrite = !tr;
+    }
+    const side = m.userData.keepSide || tr || sec ? THREE.DoubleSide : THREE.FrontSide;
+    if (m.side !== side) { m.side = side; m.needsUpdate = true; }
+  }
+  for (const s of g.userData.innerSheets) s.visible = tr;
+}
+
+function updateClipping() {
+  const g = board(), a = state.section.axis;
+  clipPlanes.length = 0;
+  if (!g || !built || a === 'off') return;
+  const { b, cx, cy } = built, pos = state.section.pos;
+  const plane = a === 'x'
+    ? new THREE.Plane(new THREE.Vector3(-1, 0, 0), b[0] + pos * (b[2] - b[0]) - cx)
+    : new THREE.Plane(new THREE.Vector3(0, -1, 0), b[1] + pos * (b[3] - b[1]) - cy);
+  g.updateMatrixWorld(true);
+  clipPlanes.push(plane.applyMatrix4(g.matrixWorld));
+}
+
+/* ---------- Measure tool ---------- */
+function makeMeasureHelpers(g) {
+  const D = built.disp, r = 1;   // unit sphere, rescaled every frame to a fixed size on screen
+  const mat = new THREE.MeshBasicMaterial({ color: '#ff3d71', depthTest: false, transparent: true, toneMapped: false }); D.push(mat);
+  const sg = new THREE.SphereGeometry(r, 18, 12); D.push(sg);
+  const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(6), 3)); D.push(lg);
+  const lm = new THREE.LineBasicMaterial({ color: '#ff3d71', depthTest: false, transparent: true, toneMapped: false }); D.push(lm);
+  const a = new THREE.Mesh(sg, mat), bm = new THREE.Mesh(sg, mat), line = new THREE.Line(lg, lm);
+  for (const o of [a, bm, line]) { o.userData.helper = true; o.renderOrder = 1e9; o.visible = false; o.frustumCulled = false; g.add(o); }
+  g.userData.mh = { a, b: bm, line };
+}
+function measurePts() {
+  const pts = state.meas.pts.slice();
+  if (pts.length === 1 && state.meas.hover) pts.push(state.meas.hover);
+  return pts;
+}
+function updateMeasureHelpers() {
+  const g = board(); if (!g || !g.userData.mh) { renderMeasureInfo([]); return; }
+  const { a, b, line } = g.userData.mh, pts = measurePts(), surf = g.userData.surf;
+  const z = p => p.side === 'bot' ? surf.bot - 0.02 : surf.top + 0.02;
+  a.visible = pts.length > 0; b.visible = line.visible = pts.length > 1;
+  if (pts[0]) a.position.set(pts[0].x, pts[0].y, z(pts[0]));
+  if (pts[1]) {
+    b.position.set(pts[1].x, pts[1].y, z(pts[1]));
+    const arr = line.geometry.attributes.position;
+    arr.setXYZ(0, a.position.x, a.position.y, a.position.z); arr.setXYZ(1, b.position.x, b.position.y, b.position.z);
+    arr.needsUpdate = true; line.geometry.computeBoundingSphere();
+  }
+  renderMeasureInfo(pts);
+}
+const fmt = v => v.toFixed(3);
+function renderMeasureInfo(pts) {
+  const el = document.getElementById('measInfo');
+  if (pts.length < 2 || !built) {
+    el.innerHTML = `<dt>Status</dt><dd>${state.meas.on ? (pts.length ? 'Click the second point' : 'Click the first point') : 'Off'}</dd>`;
+    return;
+  }
+  const [p, q] = pts, dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy);
+  const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+  el.innerHTML = [
+    ['Distance', `<b>${fmt(d)} mm</b> · ${(d / 0.0254).toFixed(1)} mil`],
+    ['ΔX / ΔY', `${fmt(dx)} / ${fmt(dy)} mm`],
+    ['Angle', `${ang.toFixed(2)}°`],
+    ['A', `${fmt(p.x + built.cx)}, ${fmt(p.y + built.cy)}${p.snapped ? ' · snapped' : ''}`],
+    ['B', `${fmt(q.x + built.cx)}, ${fmt(q.y + built.cy)}${q.snapped ? ' · snapped' : ''}`],
+  ].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+}
+// Size in mm that one screen pixel covers at a world point, for the active camera
+const MARKER_PX = 4;   // marker radius in screen pixels
+function mmPerPixel(worldPt) {
+  const h = viewEl.clientHeight || 1;
+  if (cam.isOrthographicCamera) return (cam.top - cam.bottom) / cam.zoom / h;
+  return worldPt.distanceTo(cam.position) * 2 * Math.tan(cam.fov * Math.PI / 360) / h;
+}
+const mpTmp = new THREE.Vector3();
+function placeMeasureLabel(g) {
+  const mh = g.userData.mh;
+  if (mh) for (const m of [mh.a, mh.b]) if (m.visible) m.scale.setScalar(MARKER_PX * mmPerPixel(m.getWorldPosition(mpTmp)));
+  if (!mh || !mh.line.visible) { mlabel.style.display = 'none'; return; }
+  tmpV.copy(mh.a.position).add(mh.b.position).multiplyScalar(0.5);
+  g.localToWorld(tmpV); tmpV.project(cam);
+  if (tmpV.z > 1) { mlabel.style.display = 'none'; return; }
+  const pts = measurePts(), d = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+  mlabel.textContent = d.toFixed(3) + ' mm';
+  mlabel.style.left = ((tmpV.x + 1) / 2 * viewEl.clientWidth) + 'px';
+  mlabel.style.top = ((1 - tmpV.y) / 2 * viewEl.clientHeight) + 'px';
+  mlabel.style.display = 'block';
+}
+function snapPt(x, y, r = 0.6) {
+  if (!built) return null;
+  let best = null, bd = r;
+  const gx = Math.floor(x), gy = Math.floor(y);
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const p of built.snap.get((gx + i) + ',' + (gy + j)) || []) {
+    const d = Math.hypot(p[0] - x, p[1] - y); if (d < bd) { bd = d; best = p; }
+  }
+  return best;
+}
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function pickAt(e, objs) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, cam);
+  return ray.intersectObjects(objs, false).filter(h => !clipPlanes.length || clipPlanes[0].distanceToPoint(h.point) >= -1e-6);
+}
+function boardHit(e) {
+  const g = board(); if (!g || !built) return null;
+  const hits = pickAt(e, g.userData.pick); if (!hits.length) return null;
+  const p = g.worldToLocal(hits[0].point.clone());
+  let pt = { x: p.x, y: p.y, side: p.z >= 0 ? 'top' : 'bot', snapped: false };
+  if (!e.altKey) { const s = snapPt(p.x + built.cx, p.y + built.cy); if (s) pt = { x: s[0] - built.cx, y: s[1] - built.cy, side: pt.side, snapped: true }; }
+  return pt;
+}
+function setMeasure(on) {
+  state.meas.on = on; state.meas.hover = null;
+  if (!on) state.meas.pts = [];
+  document.getElementById('measBtn').setAttribute('aria-pressed', on);
+  viewEl.classList.toggle('measuring', on);
+  updateMeasureHelpers();
+}
+
+/* ---------- Pointer: measuring, coordinates, component tooltips ---------- */
+const coordsEl = document.getElementById('coords'), tipEl = document.getElementById('tip');
+let downAt = null, lastMove = null, movePending = false;
+renderer.domElement.addEventListener('pointerdown', e => { downAt = { x: e.clientX, y: e.clientY }; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downAt) return;
+  const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y); downAt = null;
+  if (moved > 5 || e.button !== 0 || !state.meas.on) return;
+  const p = boardHit(e); if (!p) return;
+  if (state.meas.pts.length >= 2) state.meas.pts = [];
+  state.meas.pts.push(p); state.meas.hover = null;
+  updateMeasureHelpers();
+});
+renderer.domElement.addEventListener('pointermove', e => {
+  lastMove = e;
+  if (movePending) return; movePending = true;
+  requestAnimationFrame(() => { movePending = false; hover(lastMove); });
+});
+renderer.domElement.addEventListener('pointerleave', () => { coordsEl.style.display = 'none'; tipEl.style.display = 'none'; });
+function hover(e) {
+  const g = board(); if (!g || !built) return;
+  const p = boardHit(e);
+  if (p) { coordsEl.style.display = 'block'; coordsEl.textContent = `X ${fmt(p.x + built.cx)}   Y ${fmt(p.y + built.cy)} mm${p.snapped ? ' · snap' : ''}`; }
+  else coordsEl.style.display = 'none';
+  if (state.meas.on && state.meas.pts.length === 1) { state.meas.hover = p; updateMeasureHelpers(); }
+  const ch = g.userData.compMeshes.length && !state.meas.on ? pickAt(e, g.userData.compMeshes) : [];
+  if (ch.length && ch[0].instanceId != null) {
+    const c = ch[0].object.userData.comps[ch[0].instanceId], r = viewEl.getBoundingClientRect();
+    const esc = s => String(s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+    tipEl.innerHTML = `<b>${esc(c.ref || '?')}</b>${c.val ? ' · ' + esc(c.val) : ''}<br><span class="muted">${esc(c.pkg || 'unknown package')} · ${c.bottom ? 'bottom' : 'top'} · ${c.rot}°</span>`;
+    tipEl.style.left = Math.min(e.clientX - r.left + 14, r.width - 270) + 'px'; tipEl.style.top = (e.clientY - r.top + 14) + 'px';
+    tipEl.style.display = 'block';
+  } else tipEl.style.display = 'none';
 }
 
 /* ---------- UI ---------- */
 const filesEl = document.getElementById('files');
 function renderFiles() {
-  if (!state.files.length) { filesEl.innerHTML = '<div style="color:var(--muted);font-size:12px">No files loaded.</div>'; return; }
+  const ign = state.files.filter(f => f.type === 'ignore');
+  document.getElementById('filesHead').textContent = state.files.length ? `Files (${state.files.length})` : 'Files';
+  document.getElementById('clearBtn').disabled = !state.files.length;
+  const rmI = document.getElementById('rmIgnored');
+  rmI.hidden = !ign.length || ign.length === state.files.length; rmI.textContent = `Remove ignored (${ign.length})`;
+  if (!state.files.length) { filesEl.innerHTML = '<div class="muted">No files loaded.</div>'; return; }
   filesEl.innerHTML = '';
   const order = Object.keys(TYPES);
   const sorted = state.files.slice().sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type) || a.name.localeCompare(b.name));
   for (const f of sorted) {
-    const el = document.createElement('div'); el.className = 'file';
+    const el = document.createElement('div'); el.className = 'file' + (f.type === 'ignore' ? ' ignored' : '');
     const nm = document.createElement('div'); nm.className = 'nm'; nm.title = f.name;
-    nm.innerHTML = `<span class="dot" style="background:${TYPES[f.type].color}"></span>`; nm.append(f.name);
-    const sel = document.createElement('select');
+    nm.innerHTML = `<span class="dot" style="background:${f.type === 'ignore' ? 'transparent' : PCOL(f.type)}"></span>`; nm.append(f.name);
+    const sel = document.createElement('select'); sel.setAttribute('aria-label', 'Layer type for ' + f.name);
     for (const [k, v] of Object.entries(TYPES)) { const o = document.createElement('option'); o.value = k; o.textContent = v.label; if (k === f.type) o.selected = true; sel.append(o); }
     sel.onchange = () => { f.type = sel.value; rebuild(); };
     const stt = document.createElement('div'); stt.className = 'st';
     if (f.err) { stt.className += ' err'; stt.textContent = 'Parse error: ' + f.err; }
-    else if (f.type === 'ignore') stt.textContent = 'Not rendered';
+    else if (f.type === 'ignore') stt.textContent = ignoreHint(f.name, f.binary);
+    else if (f.parsed?.comps) stt.textContent = f.parsed.comps.length + ' components' + (f.note ? ' · ' + f.note : '');
     else if (f.parsed?.holes) stt.textContent = f.parsed.holes.length + ' holes';
     else if (f.parsed?.ops) stt.textContent = f.parsed.ops.length + ' objects' + (f.parsed.warnings?.length ? ' · ' + f.parsed.warnings.join('; ') : '');
-    el.append(nm, sel, stt); filesEl.append(el);
+    const del = document.createElement('button'); del.className = 'xbtn'; del.textContent = '×';
+    del.title = 'Remove ' + f.name; del.setAttribute('aria-label', 'Remove ' + f.name);
+    del.onclick = () => removeFiles([f], f.name);
+    el.append(nm, sel, del, stt); filesEl.append(el);
   }
 }
-function updateInfo(nHoles) {
+
+const LAYER_ROWS = [   // [key, label, has opacity slider]
+  ['top-silk', 'Top silk', 1], ['top-paste', 'Top paste', 1], ['top-mask', 'Top mask', 1], ['top-copper', 'Top copper', 1],
+  ['inner', 'Inner copper', 1], ['bottom-copper', 'Bottom copper', 1], ['bottom-mask', 'Bottom mask', 1],
+  ['bottom-paste', 'Bottom paste', 1], ['bottom-silk', 'Bottom silk', 1], ['outline', 'Outline', 0], ['holes', 'Holes', 0], ['pnp', 'Components', 1],
+];
+const layersEl = document.getElementById('layers');
+// Colour dot that opens a colour picker (used by the Layer colors style)
+function colorDot(k, label) {
+  const lab = document.createElement('label'); lab.className = 'dotpick'; lab.style.setProperty('--c', PCOL(k));
+  lab.title = 'Change ' + label.toLowerCase() + ' color';
+  const c0 = PCOL(k), inp = document.createElement('input'); inp.type = 'color'; inp.value = /^#[0-9a-f]{6}$/i.test(c0) ? c0 : '#888888'; inp.setAttribute('aria-label', lab.title);
+  inp.oninput = () => {
+    palette()[k] = inp.value; lab.style.setProperty('--c', inp.value);
+    restyleSoon();
+    if (k !== 'board') renderFiles();
+    document.getElementById('resetColors').hidden = false;
+  };
+  inp.onchange = () => saveSettings();
+  lab.append(inp); return lab;
+}
+function renderLayers() {
+  if (!built) { layersEl.innerHTML = '<div class="muted">Load files to see layers.</div>'; return; }
+  const present = k => k === 'inner' ? built.inners.length : k === 'holes' ? built.holes.length : k === 'pnp' ? built.comps.length : opsOf(k).length;
+  const lay = isLayers();
+  layersEl.innerHTML = '';
+  for (const [k, label, hasA] of LAYER_ROWS) {
+    if (!present(k)) continue;
+    if (k === 'outline' && !lay) continue;              // the outline line is only drawn in Layer colors style
+    const l = L(k), row = document.createElement('div'); row.className = 'lrow' + (l.on ? '' : ' off');
+    const lab = document.createElement('label');
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = l.on; cb.setAttribute('aria-label', 'Show ' + label);
+    lab.append(cb, k === 'inner' && built.inners.length > 1 ? `${label} ×${built.inners.length}` : label);
+    // Colours are editable in Layer colors style; in Realistic the dot just identifies the layer
+    let dot;
+    if (k !== 'pnp') dot = colorDot(k, label);
+    else { dot = document.createElement('span'); dot.className = 'dot'; dot.style.background = LCOL(k); }
+    row.append(dot, lab);
+    cb.onchange = () => { l.on = cb.checked; row.classList.toggle('off', !l.on); layerChanged(k); };
+    if (hasA) {
+      const rg = document.createElement('input'); rg.type = 'range'; rg.min = 0; rg.max = 100; rg.value = Math.round(l.a * 100);
+      rg.setAttribute('aria-label', label + ' opacity'); rg.title = 'Opacity';
+      rg.oninput = () => { l.a = rg.value / 100; layerChanged(k, true); };
+      row.append(rg);
+    } else row.append(document.createElement('span'));
+    layersEl.append(row);
+  }
+  {
+    // Board colour: no checkbox, so a spacer keeps the name aligned with the rows above
+    const l = L('board'), row = document.createElement('div'); row.className = 'lrow' + (l.on ? '' : ' off');
+    const name = lay ? 'Board background' : 'Board material';
+    const lab = document.createElement('label');
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = l.on; cb.setAttribute('aria-label', 'Show ' + name.toLowerCase());
+    lab.append(cb, name);
+    cb.onchange = () => { l.on = cb.checked; row.classList.toggle('off', !l.on); layerChanged('board'); };
+    // The slider is the same setting as Substrate opacity in Appearance
+    const rg = document.createElement('input'); rg.type = 'range'; rg.min = 10; rg.max = 100; rg.id = 'boardRowOp';
+    rg.value = Math.round(state.boardOpacity * 100); rg.title = 'Opacity'; rg.setAttribute('aria-label', name + ' opacity');
+    rg.oninput = () => setSubstrate(rg.value / 100);
+    row.append(colorDot('board', name), lab, rg);
+    layersEl.append(row);
+  }
+  const foot = document.createElement('div'); foot.className = 'lfoot';
+  foot.innerHTML = '<span class="muted">Click a dot to change its color' + (lay ? '' : ' in 3D') + '.</span> <button class="linkbtn" id="resetColors">Reset colors</button>';
+  layersEl.append(foot);
+  const rb = document.getElementById('resetColors');
+  rb.hidden = !Object.keys(palette()).length;
+  rb.onclick = () => { if (lay) state.colors = {}; else state.rcolors = {}; renderLayers(); renderFiles(); restyle(); };
+  if (built.inners.length && !lay) layersEl.insertAdjacentHTML('beforeend', '<p class="muted" style="margin:6px 0 0">Inner layers show through when substrate opacity is below 100% (or X-ray is on), or in the exploded view.</p>');
+}
+function layerChanged(k, opacityOnly) {
+  if (k === 'pnp' && opacityOnly) { const g = board(); if (g) setCompOpacity(g); saveSettings(); return; }
+  restyleSoon();
+}
+
+function updateInfo() {
   const info = document.getElementById('info'), b = state.board;
   if (!b) { info.innerHTML = '<dt>Size</dt><dd>—</dd>'; return; }
   const rows = [
     ['Size', `${b.w.toFixed(2)} × ${b.h.toFixed(2)} mm`],
-    ['Outline', b.hasOutline ? 'From outline layer' + (b.cutouts ? ` · ${b.cutouts} cutout${b.cutouts > 1 ? 's' : ''}` : '') : 'Not found · bounding box'],
-    ['Holes', built ? `${built.cut.length + built.painted.length}` + (built.painted.length ? ` (${built.painted.length} drawn flat)` : '') : '—'],
+    ['Outline', b.hasOutline
+      ? 'From ' + b.outlineFrom + (b.cutouts ? ` · ${b.cutouts} cutout${b.cutouts > 1 ? 's' : ''}` : '') + (b.ignoredShapes ? ` · ${b.ignoredShapes} larger shape${b.ignoredShapes > 1 ? 's' : ''} ignored (drawing frame)` : '')
+      : 'Not found · framed around the pads'],
+    ['Holes', !built ? '—'
+      : !state.files.some(f => /^drill/.test(f.type) && f.parsed && !f.err) ? 'None — no drill file loaded'
+      : `${built.cut.length + built.painted.length}` + (built.painted.length ? ` (${built.painted.length} drawn flat)` : '')],
     ['Thickness', state.thick + ' mm'],
   ];
-  const inner = layersOf('inner').length; if (inner) rows.push(['Inner layers', inner]);
+  if (built?.inners.length) rows.push(['Inner layers', built.inners.length]);
+  if (built?.comps.length) rows.push(['Components', `${built.comps.filter(c => !c.bottom).length} top · ${built.comps.filter(c => c.bottom).length} bottom`]);
   info.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
 }
 
@@ -1100,14 +2007,17 @@ function rebuild(resetView) {
   setTimeout(() => {
     try { buildBoard(); } catch (e) { console.error(e); }
     renderFiles(); busy.classList.remove('on');
-    if (resetView && state.board) setView('iso', true);
+    if (resetView && state.board) setView(state.is2D ? side2D : 'iso', true);
   }, 20);
 }
 function restyle() {
+  saveSettings();
   if (!built) return;
   busy.classList.add('on');
-  setTimeout(() => { buildGeometry(); updateInfo(); busy.classList.remove('on'); }, 10);
+  setTimeout(() => { try { buildGeometry(); } catch (e) { console.error(e); } updateInfo(); busy.classList.remove('on'); }, 10);
 }
+let restyleTimer = null;
+function restyleSoon() { clearTimeout(restyleTimer); restyleTimer = setTimeout(restyle, 120); }
 
 let uid = 0;
 async function addFiles(list) {
@@ -1121,7 +2031,7 @@ async function addFilesInner(list) {
       const zip = await JSZip.loadAsync(file);
       for (const entry of Object.values(zip.files)) {
         if (entry.dir || /(^|\/)(__MACOSX|\.)/.test(entry.name)) continue;
-        if (/\.(pdf|png|jpe?g|zip|gbrjob|json|rpt|html?|md|csv|xlsx?|step|stp)$/i.test(entry.name)) continue;
+        if (/\.(pdf|png|jpe?g|zip|gbrjob|json|rpt|html?|md|xlsx?|step|stp)$/i.test(entry.name)) continue;
         added.push({ name: entry.name.split('/').pop(), text: await entry.async('string') });
       }
     } else {
@@ -1130,25 +2040,72 @@ async function addFilesInner(list) {
     }
   }
   for (const a of added) {
-    if (/\u0000/.test(a.text.slice(0, 2000))) continue;
+    // Binary files (e.g. Altium's EIA .DRL) are listed with an explanation instead of silently dropped
+    const head = a.text.slice(0, 2000), ctrl = (head.match(/[\u0000-\u0008\u000e-\u001f�]/g) || []).length;
+    if (ctrl > Math.max(4, head.length * 0.05)) { state.files.push({ id: ++uid, name: a.name, text: '', type: 'ignore', binary: true }); continue; }
     state.files.push({ id: ++uid, name: a.name, text: a.text, type: detectType(a.name, a.text) });
   }
   rebuild(true);
 }
 
 document.getElementById('fileInput').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
-document.getElementById('clearBtn').onclick = () => { state.files = []; rebuild(); };
+// Removing files: always undoable for a few seconds instead of asking for confirmation
+let undoSet = null, toastTimer = null;
+function removeFiles(list, label) {
+  if (!list.length) return;
+  undoSet = list.slice();
+  state.files = state.files.filter(f => !list.includes(f));
+  rebuild(!state.files.length);
+  showToast(list.length === 1 ? `Removed ${label || list[0].name}` : `Removed ${list.length} files`);
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg; t.classList.add('on');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.classList.remove('on'); undoSet = null; }, 6000);
+}
+document.getElementById('toastUndo').onclick = () => {
+  if (!undoSet) return;
+  const back = undoSet; undoSet = null;
+  state.files.push(...back.filter(f => !state.files.includes(f)));
+  document.getElementById('toast').classList.remove('on'); clearTimeout(toastTimer);
+  rebuild(true);
+};
+document.getElementById('clearBtn').onclick = () => removeFiles(state.files.slice());
+document.getElementById('rmIgnored').onclick = () => removeFiles(state.files.filter(f => f.type === 'ignore'));
 
+// Appearance
+// Picking a mask, finish or silk colour here applies to both sides, replacing per-layer picks for that kind
+function clearOverrides(kind) { for (const k of Object.keys(state.rcolors)) if (k.endsWith('-' + kind)) delete state.rcolors[k]; renderLayers(); renderFiles(); }
 const sw = document.getElementById('maskSw');
 for (const [c, n] of MASKS) {
   const bt = document.createElement('button'); bt.className = 'sw'; bt.style.background = c; bt.title = n; bt.setAttribute('aria-label', n + ' mask');
   bt.setAttribute('aria-pressed', c === state.mask);
-  bt.onclick = () => { state.mask = c; sw.querySelectorAll('.sw').forEach(x => x.setAttribute('aria-pressed', x === bt)); restyle(); };
+  bt.onclick = () => { state.mask = c; clearOverrides('mask'); sw.querySelectorAll('.sw').forEach(x => x.setAttribute('aria-pressed', x === bt)); maskName(); restyle(); };
   sw.append(bt);
 }
-document.getElementById('finish').onchange = e => { state.finish = e.target.value; restyle(); };
-document.getElementById('silkColor').onchange = e => { state.silk = e.target.value; restyle(); };
+sw.style.setProperty('--n', MASKS.length);
+const maskName = () => { document.getElementById('maskName').textContent = (MASKS.find(([c]) => c === state.mask) || [, 'Custom'])[1]; };
+maskName();
+const styleSel = document.getElementById('style');
+// 2D and 3D each keep their own style: classic layer colours in 2D, realistic in 3D by default
+function syncStyleSel() {
+  styleSel.value = curStyle(); document.getElementById('styleLbl').textContent = 'Style · ' + (state.is2D ? '2D' : '3D');
+  document.querySelectorAll('#styleSeg [data-style]').forEach(b => b.setAttribute('aria-checked', b.dataset.style === curStyle()));
+}
+function setStyle(v) {
+  if (v === curStyle()) return;
+  state[state.is2D ? 'style2D' : 'style3D'] = v; syncStyleSel(); renderLayers(); restyle();
+}
+styleSel.onchange = () => setStyle(styleSel.value);
+document.querySelectorAll('#styleSeg [data-style]').forEach(b => b.onclick = () => setStyle(b.dataset.style));
+syncStyleSel();
+const finishSel = document.getElementById('finish'); finishSel.value = state.finish;
+finishSel.onchange = e => { state.finish = e.target.value; clearOverrides('copper'); restyle(); };
+const silkSel = document.getElementById('silkColor'); silkSel.value = state.silk;
+silkSel.onchange = e => { state.silk = e.target.value; clearOverrides('silk'); restyle(); };
 const thickSel = document.getElementById('thick'), thickIn = document.getElementById('thickCustom');
+if ([...thickSel.options].some(o => +o.value === state.thick)) thickSel.value = [...thickSel.options].find(o => +o.value === state.thick).value;
+else { thickSel.value = 'custom'; thickIn.hidden = false; thickIn.value = state.thick; }
 const applyThick = v => {
   v = parseFloat(v);
   if (!Number.isFinite(v) || v < 0.1 || v > 10) { thickIn.style.borderColor = 'var(--err)'; return; }
@@ -1162,18 +2119,147 @@ thickSel.onchange = () => {
 let thickTimer = null;
 thickIn.oninput = () => { clearTimeout(thickTimer); thickTimer = setTimeout(() => applyThick(thickIn.value), 350); };
 thickIn.onchange = () => { clearTimeout(thickTimer); applyThick(thickIn.value); };
-for (const [id, k] of [['tMask', 'mask'], ['tSilk', 'silk'], ['tCu', 'cu'], ['tHoles', 'holes']])
-  document.getElementById(id).onchange = e => { state.show[k] = e.target.checked; restyle(); };
 
+const boardOp = document.getElementById('boardOp'), boardOpV = document.getElementById('boardOpV');
+boardOp.value = Math.round(state.boardOpacity * 100); boardOpV.textContent = boardOp.value + '%';
+const xrayBtn = document.getElementById('xrayBtn');
+let xrayPrev = 1;
+function setSubstrate(v, immediate) {
+  const was = state.boardOpacity < 0.999;
+  state.boardOpacity = v; boardOp.value = Math.round(v * 100); boardOpV.textContent = boardOp.value + '%';
+  const rowOp = document.getElementById('boardRowOp'); if (rowOp) rowOp.value = boardOp.value;
+  xrayBtn.setAttribute('aria-pressed', v < 0.999);
+  updateMaterials();
+  // Caps hold the substrate alpha in their textures, so they are recomposed (not needed in the exploded view)
+  if (built && !board()?.userData.exploded) { if (immediate || was !== (v < 0.999)) restyle(); else restyleSoon(); }
+  else saveSettings();
+}
+boardOp.oninput = () => setSubstrate(boardOp.value / 100);
+xrayBtn.setAttribute('aria-pressed', state.boardOpacity < 0.999);
+xrayBtn.onclick = () => {
+  if (state.boardOpacity < 0.999) setSubstrate(1, true);
+  else setSubstrate(xrayPrev < 0.999 ? xrayPrev : 0.25, true);
+};
+boardOp.onchange = () => { if (state.boardOpacity < 0.999) xrayPrev = state.boardOpacity; saveSettings();
+};
+
+// View: explode and cross-section
+const explode = document.getElementById('explode'), explodeV = document.getElementById('explodeV');
+explode.oninput = () => {
+  const was = state.explode > 0.001;
+  state.explode = explode.value / 100; explodeV.textContent = explode.value + '%';
+  if ((state.explode > 0.001) !== was) restyle(); else layoutStack(board());
+};
+const secAxis = document.getElementById('secAxis'), secPos = document.getElementById('secPos'), secPosV = document.getElementById('secPosV');
+secAxis.onchange = () => { state.section.axis = secAxis.value; document.getElementById('secPosRow').hidden = secAxis.value === 'off'; updateClipping(); updateMaterials(); };
+secPos.oninput = () => { state.section.pos = secPos.value / 1000; secPosV.textContent = Math.round(secPos.value / 10) + '%'; updateClipping(); };
+
+// Toolbar
 document.querySelectorAll('[data-view]').forEach(bt => bt.onclick = () => {
   const v = bt.dataset.view;
-  if (v === 'flip') { state.flipped = !state.flipped; const g = boardRoot.children[0]; if (g) g.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), Math.PI); return; }
-  setView(v);
+  if (v === 'flip') {
+    state.flipped = !state.flipped; const g = board();
+    if (g) { g.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), Math.PI); updateClipping(); }
+    return;
+  }
+  if (v === 'iso') { if (state.is2D) set2D(false); else setView('iso'); markView('iso'); return; }
+  if (state.is2D) { side2D = v; setView(v, true); } else setView(v);
+  markView(v);
 });
-document.getElementById('pngBtn').onclick = () => {
-  renderer.render(scene, camera);
-  const a = document.createElement('a'); a.download = 'pcb-3d.png'; a.href = renderer.domElement.toDataURL('image/png'); a.click();
+document.querySelectorAll('.seg [data-mode]').forEach(b => b.onclick = () => { const on = b.dataset.mode === '2d'; if (on !== state.is2D) set2D(on); });
+document.getElementById('measBtn').onclick = () => setMeasure(!state.meas.on);
+addEventListener('keydown', e => {
+  if (/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName || '') || e.ctrlKey || e.metaKey) return;
+  if (e.key === 'm' || e.key === 'M') setMeasure(!state.meas.on);
+  else if (e.key === '2' && !state.is2D) set2D(true);
+  else if (e.key === '3' && state.is2D) set2D(false);
+  else if (e.key === 'Escape') { state.meas.pts = []; state.meas.hover = null; updateMeasureHelpers(); }
+});
+
+// Export
+function download(blob, name) {
+  const a = document.createElement('a'); a.download = name; a.href = URL.createObjectURL(blob); a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+function savePNG() {
+  renderer.render(scene, cam);
+  const a = document.createElement('a'); a.download = 'pcb.png'; a.href = renderer.domElement.toDataURL('image/png'); a.click();
+}
+document.getElementById('pngBtn').onclick = savePNG;
+document.getElementById('pngBtn2').onclick = savePNG;
+// Collect visible board meshes in board coordinates (mm, Z up), instancing expanded
+function exportRoot(forSTL) {
+  const g = board(); if (!g) return null;
+  g.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
+  const rel = o => new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+  const root = new THREE.Group();
+  g.traverse(o => {
+    if (!o.isMesh || o.userData.helper || !o.visible) return;
+    if (forSTL && o.userData.sheet) return;
+    if (o.userData.substrate) { if (o.userData.primary) root.add(new THREE.Mesh(o.geometry.clone().applyMatrix4(rel(o)), o.userData.allMats)); return; }
+    if (o.isInstancedMesh) {
+      const R = rel(o), m = new THREE.Matrix4(), parts = [];
+      for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, m); parts.push(o.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(R, m))); }
+      const merged = parts.length ? mergeGeometries(parts, false) : null; parts.forEach(p => p.dispose());
+      if (merged) root.add(new THREE.Mesh(merged, o.material));
+      return;
+    }
+    root.add(new THREE.Mesh(o.geometry.clone().applyMatrix4(rel(o)), o.material));
+  });
+  return root;
+}
+const disposeRoot = r => r.traverse(o => o.geometry?.dispose());
+document.getElementById('glbBtn').onclick = () => {
+  const root = exportRoot(false); if (!root) return;
+  busy.textContent = 'Exporting…'; busy.classList.add('on');
+  const wrap = new THREE.Group(); wrap.rotation.x = -Math.PI / 2; wrap.scale.setScalar(0.001); wrap.add(root);  // glTF: Y up, metres
+  new GLTFExporter().parse(wrap, buf => {
+    download(new Blob([buf], { type: 'model/gltf-binary' }), 'pcb.glb'); disposeRoot(root);
+    busy.classList.remove('on'); busy.textContent = 'Rendering…';
+  }, err => { console.error(err); alert('GLB export failed: ' + (err.message || err)); busy.classList.remove('on'); busy.textContent = 'Rendering…'; }, { binary: true });
 };
+document.getElementById('stlBtn').onclick = () => {
+  const root = exportRoot(true); if (!root) return;
+  root.updateMatrixWorld(true);
+  const data = new STLExporter().parse(root, { binary: true });
+  download(new Blob([data], { type: 'model/stl' }), 'pcb.stl'); disposeRoot(root);
+};
+
+// Theme
+const themeBtn = document.getElementById('themeBtn'), mq = matchMedia('(prefers-color-scheme: dark)');
+function applyTheme() {
+  const r = document.documentElement;
+  if (state.theme === 'auto') delete r.dataset.theme; else r.dataset.theme = state.theme;
+  themeBtn.textContent = { auto: 'Auto', light: 'Light', dark: 'Dark' }[state.theme];
+  themeBtn.title = 'Theme: ' + themeBtn.textContent + ' (click to change)';
+  applyBg();
+}
+// Viewport background: follows the theme, or a fixed colour the person picks
+const BGS = [['theme', 'Follow theme'], ['#e8e9ed', 'Light grey'], ['#ffffff', 'White'], ['#8a8f98', 'Mid grey'], ['#2b3038', 'Slate'], ['#17191e', 'Dark'], ['#000000', 'Black'], ['#1e3350', 'Navy']];
+const bgSw = document.getElementById('bgSw'), bgCustom = document.getElementById('bgCustom'), bgCustomSw = document.getElementById('bgCustomSw');
+function applyBg() {
+  const themed = getComputedStyle(document.documentElement).getPropertyValue('--scene').trim() || '#e8e9ed';
+  scene.background = new THREE.Color(state.bg === 'theme' ? themed : state.bg);
+  const preset = BGS.find(([c]) => c === state.bg);
+  bgSw.querySelectorAll('button.sw').forEach(x => x.setAttribute('aria-pressed', x.dataset.bg === state.bg));
+  bgCustomSw.setAttribute('aria-pressed', !preset);
+  if (!preset) { bgCustom.value = state.bg; bgCustomSw.style.setProperty('--c', state.bg); }
+  document.getElementById('bgName').textContent = preset ? preset[1] : 'Custom ' + state.bg.toUpperCase();
+}
+for (const [c, n] of BGS) {
+  const bt = document.createElement('button'); bt.className = 'sw'; bt.dataset.bg = c; bt.title = n; bt.setAttribute('aria-label', n + ' background');
+  bt.style.background = c === 'theme' ? 'linear-gradient(135deg,#eceef2 50%,#1b1e24 50%)' : c;
+  bt.onclick = () => { state.bg = c; applyBg(); saveSettings(); };
+  bgSw.insertBefore(bt, bgCustomSw);
+}
+bgSw.style.setProperty('--n', BGS.length + 1);
+bgCustom.oninput = () => { state.bg = bgCustom.value; applyBg(); };
+bgCustom.onchange = saveSettings;
+themeBtn.onclick = () => { state.theme = { auto: 'light', light: 'dark', dark: 'auto' }[state.theme]; applyTheme(); saveSettings(); };
+mq.addEventListener?.('change', applyTheme);
+applyTheme();
+renderMeasureInfo([]);
 
 // Drag & drop (works anywhere on the page)
 const drop = document.getElementById('drop');
@@ -1208,7 +2294,9 @@ document.addEventListener('drop', e => {
   } else if (files.length) addFiles(files);
 }, true);
 
-window.__viewer = { state, setView };
+set2D(state.is2D, true);   // opens in 2D by default; the last choice is remembered
+syncStyleSel();
+window.__viewer = { state, setView, set2D, parsePnP, pkgSize };
 </script>
 </body>
 </html>
