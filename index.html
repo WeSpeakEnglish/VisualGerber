@@ -1190,11 +1190,11 @@ controls.enableDamping = true; controls.dampingFactor = 0.09; controls.screenSpa
 function lightRig(c) {
   scene.add(c);
   const tgt = new THREE.Object3D(); tgt.position.set(0, 0, -1); c.add(tgt);
-  const key = new THREE.DirectionalLight(0xffffff, 1.5); key.position.set(-0.6, 0.8, 0.4); key.target = tgt; c.add(key);
+  const key = new THREE.DirectionalLight(0xffffff, 1.7); key.position.set(-0.6, 0.8, 0.4); key.target = tgt; c.add(key);
   const fill = new THREE.DirectionalLight(0xffffff, 0.45); fill.position.set(0.8, -0.3, 0.3); fill.target = tgt; c.add(fill);
 }
 lightRig(persp); lightRig(ortho);
-scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+scene.add(new THREE.AmbientLight(0xffffff, 0.15));   // low flat fill: keeps mask colours deep; metals are lit by the environment
 const boardRoot = new THREE.Group(); scene.add(boardRoot);
 const maxTex = Math.min(renderer.capabilities.maxTextureSize, 4096);
 const maxAniso = renderer.capabilities.getMaxAnisotropy();
@@ -1405,9 +1405,9 @@ function tinted(src, color, scratch) {
   return c;
 }
 function mixHex(a, b, t) {
-  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
-  const ch = s => [(s >> 16) & 255, (s >> 8) & 255, s & 255];
-  const A = ch(pa), B = ch(pb);
+  // accepts #rrggbb or rgb(r,g,b), so results can be mixed again
+  const ch = c => { const m = String(c).match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/); if (m) return [+m[1], +m[2], +m[3]]; const s = parseInt(String(c).slice(1), 16); return [(s >> 16) & 255, (s >> 8) & 255, s & 255]; };
+  const A = ch(a), B = ch(b);
   return 'rgb(' + A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',') + ')';
 }
 // Helpers draw sources scaled to the target canvas, so the same code serves full-resolution and preview passes
@@ -1595,7 +1595,7 @@ function composeSide(side) {
   if (sub < 0.999) col.dataset.alpha = '1';
   c1.globalAlpha = sub; c1.fillStyle = RCOL('board'); c1.fillRect(0, 0, Wp, Hp); c1.globalAlpha = 1;
   p1.fillStyle = 'rgb(0,200,0)'; p1.fillRect(0, 0, Wp, Hp);
-  if (cu) { put(c1, tinted(cu, maskOn ? RCOL('inner') : finish, t1), lc.a); put(p1, tinted(cu, 'rgb(150,70,255)', t1), lc.a); }
+  if (cu) { put(c1, tinted(cu, maskOn ? RCOL('inner') : finish, t1), lc.a); put(p1, tinted(cu, 'rgb(150,105,255)', t1), lc.a); }
   if (maskOn) {
     // Mask colour with copper relief showing through; openings cut away
     const cover = (base, relief, target) => {
@@ -1606,11 +1606,14 @@ function composeSide(side) {
       clipTo(t2, mask, 'destination-out');
       put(target, t2, lm.a);
     };
-    cover(maskC, mixHex(maskC, '#ffffff', /^#(e|f)/i.test(maskC) ? 0 : 0.16), c1);
+    // The scene lighting brightens diffuse surfaces about 1.5x, so the mask is pre-darkened to render at its
+    // real colour; copper under the mask shows as a slightly lighter relief, as on a real board
+    const light = /^#(e|f|d)/i.test(maskC), mBase = light ? maskC : mixHex(maskC, '#000000', 0.3);
+    cover(mBase, mixHex(mBase, '#ffffff', light ? 0 : 0.07), c1);
     cover('rgb(0,120,0)', 'rgb(150,110,0)', p1);
     if (cu) {
       put(c1, clipTo(tinted(cu, finish, t1), mask, 'destination-in'), lc.a);
-      put(p1, clipTo(tinted(cu, state.finish === 'hasl' ? 'rgb(170,95,255)' : 'rgb(170,70,255)', t1), mask, 'destination-in'), lc.a);
+      put(p1, clipTo(tinted(cu, state.finish === 'hasl' ? 'rgb(170,115,255)' : 'rgb(170,100,255)', t1), mask, 'destination-in'), lc.a);
     }
   }
   if (paste) { put(c1, tinted(paste, RCOL(side + '-paste'), t1), lp.a); put(p1, tinted(paste, 'rgb(40,150,200)', t1), lp.a); }
@@ -1620,9 +1623,11 @@ function composeSide(side) {
   }
   paintHoles(c1, RCOL('holes')); paintHoles(p1, 'rgb(0,230,0)');
   const map = texture(col, true), pt = texture(pbr, false);
-  return new THREE.MeshStandardMaterial({
+  // Physical material: specularIntensity only weakens the reflection of non-metals (mask, silk, laminate),
+  // so the mask keeps its real depth of colour instead of mirroring the bright studio, while metal stays bright
+  return new THREE.MeshPhysicalMaterial({
     map, roughnessMap: pt, metalnessMap: pt, bumpMap: pt, bumpScale: 1.6,
-    roughness: 1, metalness: 1, envMapIntensity: 1.0,
+    roughness: 1, metalness: 1, envMapIntensity: 0.75, specularIntensity: 0.4,
   });
 }
 
@@ -1776,17 +1781,20 @@ function buildGeometry() {
     let barrelMat = null;
     const getBarrelMat = () => {
       if (barrelMat) return barrelMat;
-      barrelMat = clip(new THREE.MeshStandardMaterial({ color: state.finish === 'hasl' ? '#9da2a8' : '#a07a40', metalness: 1, roughness: 0.45, side: THREE.DoubleSide }));
+      barrelMat = clip(new THREE.MeshStandardMaterial({ color: state.finish === 'hasl' ? '#c4c8cd' : state.finish === 'copper' ? '#c98a5a' : '#d2ac62', metalness: 1, roughness: 0.4, envMapIntensity: 1.25, side: THREE.DoubleSide }));
       barrelMat.userData.keepSide = barrelMat.userData.solid = true; D.push(barrelMat); g.userData.boardMats.push(barrelMat);
       return barrelMat;
     };
     if (halves.length) {   // castellated holes: plated half barrels along the notch
-      const pos = [], z = t * 0.499;
+      const pos = [], nrm = [], z = t * 0.499;
       for (const h of halves) for (let k = 0; k + 1 < h.arc.length; k++) {
         const [x1, y1] = h.arc[k], [x2, y2] = h.arc[k + 1], X1 = x1 - cx, Y1 = y1 - cy, X2 = x2 - cx, Y2 = y2 - cy;
+        const n = (x, y) => { const dx = h.x - x, dy = h.y - y, l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l, 0]; };
+        const n1 = n(x1, y1), n2 = n(x2, y2);
         pos.push(X1, Y1, -z, X2, Y2, -z, X2, Y2, z, X1, Y1, -z, X2, Y2, z, X1, Y1, z);
+        nrm.push(...n1, ...n2, ...n2, ...n1, ...n2, ...n1);
       }
-      const hg = new THREE.BufferGeometry(); hg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); hg.computeVertexNormals(); D.push(hg);
+      const hg = new THREE.BufferGeometry(); hg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); hg.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3)); D.push(hg);
       g.add(new THREE.Mesh(hg, getBarrelMat()));
     }
     if (plated.length) {
@@ -1917,7 +1925,7 @@ function updateMaterials() {
       m.transparent = tr; m.opacity = m.userData.cap ? 1 : op; m.depthWrite = !tr;
     }
     // Seen straight on in 2D, full reflections wash gold out to cream; tone them down there
-    if (m.userData.cap) m.envMapIntensity = state.is2D ? 0.45 : 1;
+    if (m.userData.cap) m.envMapIntensity = state.is2D ? 0.45 : 0.75;
     const side = m.userData.keepSide || tr || sec ? THREE.DoubleSide : THREE.FrontSide;
     if (m.side !== side) { m.side = side; m.needsUpdate = true; }
   }
