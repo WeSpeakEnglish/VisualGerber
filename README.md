@@ -35,6 +35,7 @@ No installation, no build step and no server. Files are processed locally in you
 ### Board and layers
 
 - **Real board shape** from the outline layer, including internal cutouts, slots and notches. Plated and non-plated holes are cut through the board, and plated holes get metal barrels.
+- **Castellated (half) holes**: a hole whose centre sits on a straight board edge is cut as a half-circle notch with a plated half-barrel. The Board panel counts them, and the fab check reminds you to order the castellated-hole option.
 - **All common layers drawn**: top and bottom copper, solder mask, silkscreen and paste, any number of inner copper layers, outline and drills.
 - **One card per file**: each file card has a show/hide checkbox, an opacity slider, a color dot and the layer-type dropdown, listed in physical order (top silkscreen down to bottom silkscreen, then outline, drills and pick-and-place). Hiding one file hides only that file, so for example the PTH and NPTH drill files can be switched separately. Click a dot to change that layer's color; Layers and Realistic styles keep separate palettes, and **Reset colors** under the list restores the defaults of the current style.
 - **Components** from a pick-and-place file. In 3D they are boxes sized from the package name; in 2D they are flat outlines so pads and silkscreen stay visible (bottom-side parts are drawn fainter). Hover a part to see its designator, value, package and side.
@@ -68,7 +69,7 @@ No installation, no build step and no server. Files are processed locally in you
 ### Files
 
 - Each file can be removed with its **×** button; **Remove ignored** drops all files that are not drawn; **Clear all** removes everything. Every removal can be undone for a few seconds.
-- Files that are loaded but not drawn (reports, aperture lists, Altium pad masters, mechanical layers, binary drill files, EAGLE aperture wheels and drill racks) are listed with a short explanation.
+- Files that are loaded but not drawn (reports, aperture lists, Altium pad masters, mechanical layers, drill drawings / drill maps, binary drill files, EAGLE aperture wheels and drill racks) are listed with a short explanation.
 - Files converted from old EAGLE RS-274D data are marked *converted from RS-274D* on their card, and a notice after loading lists what was corrected. So are files that were skipped: files over 60 MB, zips inside a zip and damaged zips.
 - **Your last board reopens automatically** after a page reload, with a notice that has a **Clear** button.
 
@@ -133,7 +134,7 @@ The conversion only affects what the viewer shows; your files are not changed. T
 - Tool definitions in the header or body
 - Slots via `G85` and routed paths (`G00` / `M15` / `G01` / `M16`)
 - Plated vs. non-plated detection from the file name (`NPTH`) or `TYPE=NON_PLATED` comments
-- Drill data exported in Gerber format is also accepted
+- Drill data exported in Gerber format is also accepted. Drill *drawings* (symbol charts such as `.GDD`, `.GG1` or files named *DrillDrawing*) are recognised and not mistaken for drill data.
 
 ### Pick and place (centroid)
 
@@ -195,7 +196,8 @@ Toolbar: **2D | 3D**, **Style** (Layers / Realistic), **Iso**, **Top**, **Bottom
 ## Limitations
 
 - **Missing outline**: without an outline layer, the board is framed around the pads and holes (or, with no pads, the bounding box of all layers) plus a 1 mm margin.
-- **Holes that cannot be cut**: holes that overlap each other or the board edge, and any beyond 4000, are drawn flat on the surface instead of cut through.
+- **Holes that cannot be cut**: holes that overlap each other, holes at a board corner or on a curved edge, and any beyond 4000, are drawn flat on the surface instead of cut through.
+- **Duplicate holes**: a hole listed in two drill files (EasyEDA puts vias in both the PTH and the via file) is drawn once.
 - **Binary drill files**: Altium's binary EIA `.DRL` cannot be read; use the ASCII NC drill file (`.TXT`) from the same export.
 - **Texture resolution**: this is limited by your GPU (usually 4096 px across the longest board side). Very large boards show less fine detail. While you drag a slider or color on a large board, a quicker lower-resolution preview is shown and the sharp version follows when you stop.
 - **Components are approximate**: parts are simple boxes sized from the package name, not real 3D models. Pin headers and connectors are drawn as their low plastic body.

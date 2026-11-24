@@ -921,6 +921,7 @@ function detectType(name, text) {
     if (f[0] === 'paste' && side) return side + '-paste';
     if (f[0] === 'profile') return 'outline';
     if (f[0] === 'plated' || f[0] === 'nonplated') return 'drill-gerber';
+    if (f[0] === 'drillmap') return 'ignore';
   }
   const has = re => re.test(n);
   if (has(/edge[._ -]?cuts|outline|profile|board[._ -]?shape|\.(gko|gm1|gml|dim|oln|bdr|mill)$/)) return 'outline';
@@ -933,6 +934,7 @@ function detectType(name, text) {
   if (has(/in\d+[._]cu|inner|\.g\d+$|\.gp\d+$|\.ly\d+$/)) return 'inner';
   if (has(/f[._]cu|top[._ -]?(copper|layer)|copper[._ -]?top|\.(gtl|cmp|top|tcu)$/)) return 'top-copper';
   if (has(/b[._]cu|bot(tom)?[._ -]?(copper|layer)|copper[._ -]?bot|\.(gbl|sol|bot|bcu)$/)) return 'bottom-copper';
+  if (has(/drill[._ -]?(drawing|map|guide|symbol)|\.gdd$|\.gg\d+$/)) return 'ignore';   // drill symbol charts, not drill data
   if (has(/drill|\.(drl|xln|drd)$/)) return 'drill-gerber';
   return 'ignore';
 }
@@ -1307,7 +1309,57 @@ function collectHoles() {
       }
     }
   }
-  return holes.filter(h => h.d > 0.01);
+  // The same hole listed twice (EasyEDA puts vias in both drill files) is kept once
+  const seen = new Map(), out = [], q = v => Math.round(v * 200);
+  for (const h of holes) {
+    if (!(h.d > 0.01)) continue;
+    const k = [q(h.x), q(h.y), q(h.d), h.x2 == null ? '' : q(h.x2) + ',' + q(h.y2)].join(',');
+    const o = seen.get(k); if (o) { o.plated = o.plated || h.plated; continue; }
+    seen.set(k, h); out.push(h);
+  }
+  return out;
+}
+
+// Castellated (half) holes: a round hole whose centre sits on one straight outline edge.
+// Returns the notch it cuts into that edge: segment index, positions along it and the arc inside the board.
+function edgeNotch(h, poly) {
+  if (h.x2 != null) return null;
+  const r = h.d / 2, n = poly.length; let hit = null;
+  for (let i = 0; i < n; i++) {
+    const [ax, ay] = poly[i], [bx, by] = poly[(i + 1) % n], dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+    if (!L2) continue;
+    const t = ((h.x - ax) * dx + (h.y - ay) * dy) / L2, tc = Math.max(0, Math.min(1, t));
+    const dist = Math.hypot(h.x - ax - tc * dx, h.y - ay - tc * dy);
+    if (dist >= r - 0.02) continue;
+    if (hit) return null;                                    // touches two edges (a corner): not a simple half-hole
+    const L = Math.sqrt(L2), half = Math.sqrt(r * r - dist * dist) / L;
+    if (t - half <= 0.001 || t + half >= 0.999) return null; // notch would run past the end of the edge
+    hit = { i, t1: t - half, t2: t + half };
+  }
+  if (!hit) return null;
+  const [ax, ay] = poly[hit.i], [bx, by] = poly[(hit.i + 1) % n];
+  const P = t => [ax + (bx - ax) * t, ay + (by - ay) * t], p1 = P(hit.t1), p2 = P(hit.t2);
+  const a1 = Math.atan2(p1[1] - h.y, p1[0] - h.x); let a2 = Math.atan2(p2[1] - h.y, p2[0] - h.x);
+  const ccw = ((a2 - a1) % TAU + TAU) % TAU, mid = a1 + ccw / 2;
+  const span = pip([h.x + Math.cos(mid) * r * 0.9, h.y + Math.sin(mid) * r * 0.9], poly) ? ccw : ccw - TAU;
+  const steps = Math.max(8, Math.round(Math.abs(span) / TAU * 48)), arc = [p1];
+  for (let k = 1; k < steps; k++) { const a = a1 + span * k / steps; arc.push([h.x + Math.cos(a) * r, h.y + Math.sin(a) * r]); }
+  arc.push(p2);
+  return { ...hit, arc };
+}
+function notchOutline(poly, holes) {
+  const bySeg = new Map(), used = [];
+  for (const h of holes) { const nt = edgeNotch(h, poly); if (nt) (bySeg.get(nt.i) || bySeg.set(nt.i, []).get(nt.i)).push({ h, ...nt }); }
+  const out = [];
+  for (let i = 0; i < poly.length; i++) {
+    out.push(poly[i]);
+    let last = 0;
+    for (const nt of (bySeg.get(i) || []).sort((a, b) => a.t1 - b.t1)) {
+      if (nt.t1 <= last) continue;                           // overlapping notches: keep the first
+      out.push(...nt.arc); nt.h.arc = nt.arc; used.push(nt.h); last = nt.t2;
+    }
+  }
+  return { poly: out, used };
 }
 
 // Pad and hole centres: these sit on the real board, unlike stray text or drawing frames
@@ -1324,6 +1376,7 @@ function ignoreHint(name, binary) {
   if (/\.drl$/.test(n) && binary) return 'Binary EIA drill file — not readable. Load the ASCII NC drill file (.TXT) from the same export instead.';
   if (binary) return 'Binary file — not a Gerber or drill file.';
   if (/\.drr$/.test(n)) return 'Drill report — not needed.';
+  if (/drill[._ -]?(drawing|map|guide|symbol)|\.gdd$|\.gg\d+$/.test(n)) return 'Drill drawing (symbol chart) — not drill data; holes come from the drill files.';
   if (/\.apr$/.test(n)) return 'Aperture list — not needed (RS-274X files carry their own apertures).';
   if (/\.(gpt|gpb)$/.test(n)) return 'Altium pad master — not needed.';
   if (/\.(gm\d+|gd\d+|gg\d+)$/.test(n)) return 'Mechanical / drawing layer — set its type to Outline if it holds the board shape.';
@@ -1452,9 +1505,16 @@ function buildBoard() {
   // ---- holes: which can be cut into the geometry
   const holes = collectHoles();
   const cut = [], painted = [];
+  let castell = [];
+  if (outer) {
+    const edgeHoles = holes.filter(h => edgeNotch(h, outer));
+    if (edgeHoles.length) { const nt = notchOutline(outer, edgeHoles); outer = nt.poly; castell = nt.used; }
+  }
+  const castSet = new Set(castell);
   const grid = new Map(), G = 2;
   const keyOf = (x, y) => Math.floor(x / G) + ',' + Math.floor(y / G);
   for (const h of holes) {
+    if (castSet.has(h)) continue;
     const r = h.d / 2, ends = h.x2 != null ? [[h.x, h.y], [h.x2, h.y2]] : [[h.x, h.y]];
     const inside = ends.every(p => pip(p, outer) && distToPoly(p, outer) > r + 0.03 && cutouts.every(c => !pip(p, c) && distToPoly(p, c) > r + 0.03));
     if (!ends.some(p => pip(p, outer))) continue;
@@ -1487,7 +1547,7 @@ function buildBoard() {
   for (const t of ['top-copper', 'bottom-copper']) for (const o of opsOf(t)) if (o.t === 'flash' && o.dark) addS(o.x, o.y);
   for (const c of comps) addS(c.x, c.y);
 
-  built = { view, raster: {}, inners, outer, cutouts, cut, painted, holes, comps, snap, cx, cy, b, W, H, disp: [] };
+  built = { view, raster: {}, inners, outer, cutouts, cut, painted, castell, holes, comps, snap, cx, cy, b, W, H, disp: [] };
   buildNetIndex();
   buildGeometry();
   updateInfo();
@@ -1712,10 +1772,26 @@ function buildGeometry() {
     }
     // Plated barrels
     const plated = holesOn ? cut.filter(h => h.plated && h.x2 == null) : [];
+    const halves = holesOn ? built.castell.filter(h => h.plated && h.arc) : [];
+    let barrelMat = null;
+    const getBarrelMat = () => {
+      if (barrelMat) return barrelMat;
+      barrelMat = clip(new THREE.MeshStandardMaterial({ color: state.finish === 'hasl' ? '#9da2a8' : '#a07a40', metalness: 1, roughness: 0.45, side: THREE.DoubleSide }));
+      barrelMat.userData.keepSide = barrelMat.userData.solid = true; D.push(barrelMat); g.userData.boardMats.push(barrelMat);
+      return barrelMat;
+    };
+    if (halves.length) {   // castellated holes: plated half barrels along the notch
+      const pos = [], z = t * 0.499;
+      for (const h of halves) for (let k = 0; k + 1 < h.arc.length; k++) {
+        const [x1, y1] = h.arc[k], [x2, y2] = h.arc[k + 1], X1 = x1 - cx, Y1 = y1 - cy, X2 = x2 - cx, Y2 = y2 - cy;
+        pos.push(X1, Y1, -z, X2, Y2, -z, X2, Y2, z, X1, Y1, -z, X2, Y2, z, X1, Y1, z);
+      }
+      const hg = new THREE.BufferGeometry(); hg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); hg.computeVertexNormals(); D.push(hg);
+      g.add(new THREE.Mesh(hg, getBarrelMat()));
+    }
     if (plated.length) {
       const cyl = new THREE.CylinderGeometry(1, 1, 1, 28, 1, true); cyl.rotateX(Math.PI / 2); D.push(cyl);
-      const mat = clip(new THREE.MeshStandardMaterial({ color: state.finish === 'hasl' ? '#9da2a8' : '#a07a40', metalness: 1, roughness: 0.45, side: THREE.DoubleSide }));
-      mat.userData.keepSide = mat.userData.solid = true; D.push(mat); g.userData.boardMats.push(mat);
+      const mat = getBarrelMat();
       const im = new THREE.InstancedMesh(cyl, mat, plated.length), m4 = new THREE.Matrix4();
       plated.forEach((h, i) => { const r = h.d / 2 - 0.004; m4.makeScale(r, r, t * 0.998); m4.setPosition(h.x - cx, h.y - cy, 0); im.setMatrixAt(i, m4); });
       g.add(im);
@@ -2220,7 +2296,10 @@ function padInRadius(o) {
 }
 function fabStats() {
   if (built.fab) return built.fab;
-  const { outer, cutouts, holes, b } = built, polys = [outer, ...cutouts];
+  const { outer, cutouts, holes, b, castell } = built, polys = [outer, ...cutouts];
+  const castSet = new Set(castell);
+  // copper around a castellated hole meets the edge on purpose
+  const nearCastell = (x, y, r) => castell.some(h => Math.hypot(x - h.x, y - h.y) < h.d / 2 + r + 1.2);
   const cutBoxes = cutouts.map(polyBounds);
   const onBoard = (x, y) => pip([x, y], outer) && !cutouts.some(c => pip([x, y], c));
   // distance to the nearest board edge, skipping points clearly far from every edge
@@ -2242,7 +2321,7 @@ function fabStats() {
       : o.t === 'arc' ? [[o.x1, o.y1, traceWidth(o) / 2], [o.x2, o.y2, traceWidth(o) / 2]]
       : o.t === 'region' ? (opBox(o), o._poly.flat().map(([x, y]) => [x, y, 0])) : [];
     for (const [x, y, r] of pts) {
-      if (!onBoard(x, y)) continue;
+      if (!onBoard(x, y) || (castell.length && nearCastell(x, y, r))) continue;
       const d = edgeDist(x, y, 3 + r) - r;
       if (d < edge) { edge = d; edgeAt = [x, y]; }
     }
@@ -2267,6 +2346,7 @@ function fabStats() {
   // hole to edge, hole to hole
   let holeEdge = Infinity, gapVia = Infinity, gapPad = Infinity;
   for (const h of holes) {
+    if (castSet.has(h)) continue;
     const ends = h.x2 != null ? [[h.x, h.y], [h.x2, h.y2]] : [[h.x, h.y]];
     for (const [x, y] of ends) holeEdge = Math.min(holeEdge, edgeDist(x, y, 3 + h.d) - h.d / 2);
   }
@@ -2290,7 +2370,7 @@ function fabStats() {
     W: built.W, H: built.H, layers: copperLayers, minTrace: fin(minTrace), edge: fin(edge), edgeAt,
     minPTH: minOf(pth, h => h.d), minNPTH: minOf(npth, h => h.d), maxDrill: minOf(holes, h => -h.d) != null ? -minOf(holes, h => -h.d) : null,
     viaRing: fin(viaRing), padRing: fin(padRing), noPad, holeEdge: fin(holeEdge), gapVia: fin(gapVia), gapPad: fin(gapPad), silk: fin(silk),
-    nHoles: holes.length,
+    nHoles: holes.length, castell: castell.length,
   };
 }
 function renderFab() {
@@ -2318,6 +2398,7 @@ function renderFab() {
       if (f.gapPad != null) add(minCheck(f.gapPad, P.holeGap.pad), 'Pad hole to hole', fmtL(f.gapPad), lim(P.holeGap.pad));
     }
     add(f.holeEdge == null ? 'ok' : minCheck(f.holeEdge, 0.3), 'Hole to board edge', f.holeEdge != null ? fmtL(f.holeEdge) : '> 3 mm', 'rule of thumb ≥ ' + fmtL(0.3));
+    if (f.castell) add('warn', 'Castellated half-holes', f.castell + ' on the board edge', 'order with the castellated-hole option');
   } else add('na', 'Holes', 'none', 'no drill file loaded');
   add(f.edge == null ? 'ok' : minCheck(f.edge, P.edge), 'Copper to board edge', f.edge != null ? '≈ ' + fmtL(f.edge) : '> 3 mm', P.edge != null ? lim(P.edge) : 'no published limit');
   if (f.silk != null) add(minCheck(f.silk, P.silk), 'Thinnest silkscreen line', fmtL(f.silk), lim(P.silk));
@@ -2455,7 +2536,7 @@ function updateInfo() {
       : 'Not found · framed around the pads'],
     ['Holes', !built ? '—'
       : !state.files.some(f => /^drill/.test(f.type) && f.parsed && !f.err) ? 'None — no drill file loaded'
-      : `${built.cut.length + built.painted.length}` + (built.painted.length ? ` (${built.painted.length} drawn flat)` : '')],
+      : `${built.cut.length + built.painted.length + built.castell.length}` + [built.castell.length ? `${built.castell.length} castellated` : '', built.painted.length ? `${built.painted.length} drawn flat` : ''].filter(Boolean).map((x, i, a) => (i ? '' : ' (') + x + (i === a.length - 1 ? ')' : ', ')).join('')],
     ['Thickness', state.thick + ' mm'],
   ];
   if (built?.inners.length) rows.push(['Inner layers', built.inners.length]);
