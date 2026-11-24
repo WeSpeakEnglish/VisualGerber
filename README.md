@@ -1,7 +1,7 @@
 # Gerber 3D Viewer
 
-A single-file, browser-based 2D and 3D viewer for PCB Gerber, Excellon drill and pick-and-place files,
-including old EAGLE RS-274D sets with a `.WHL` aperture file.
+A single-file, browser-based 2D and 3D viewer for PCB Gerber, Excellon drill, pick-and-place and ODB++ files,
+including old EAGLE RS-274D sets with a `.WHL` aperture file. It can also compare two versions of a board and show what changed.
 Open `index.html` in a browser, drop in your fabrication files (loose or zipped),
 and inspect the board as flat layers or as a 3D model with solder mask, surface finish, silkscreen, inner layers, drilled holes and components.
 
@@ -15,7 +15,8 @@ No installation, no build step and no server. Files are processed locally in you
 2. Click **Open files…** or drag files onto the page. You can drop:
    - individual Gerber, drill and pick-and-place files,
    - a whole folder,
-   - one or more `.zip` archives (subfolders inside the zip are fine).
+   - one or more `.zip` archives (subfolders inside the zip are fine),
+   - an ODB++ job as `.tgz`, `.tar`, `.zip` or its folder.
 3. The board opens in **2D**. Switch to **3D** with the toolbar switch (or press **2** / **3**).
 
 > The page loads three.js and JSZip from public CDNs, so an internet connection is needed when it opens.
@@ -45,6 +46,17 @@ No installation, no build step and no server. Files are processed locally in you
 - When the Gerbers carry **X2 netlist attributes** (KiCad and recent Altium exports can include them), hovering a pad or track shows its **net**, the **part and pin** (for example *I2C_SDA · U1 pin 5*) and the layer.
 - **Click** a pad or track to highlight the whole net on every copper layer; the rest of the board dims. A label shows the number of layers and pads and the total track length. **Esc** or **×** clears it.
 - The Board panel says how many nets were found, or that the files have no net names.
+
+### Compare two versions
+
+Click **Compare…** with a board loaded and pick another version of it: Gerbers, a zip, an ODB++ job or an old EAGLE set; the two versions do not have to come from the same tool. The compare view opens over the board:
+
+- **Each layer** of both versions is drawn on the same grid: **grey** where they are identical, **red** where something is only in the loaded version (A, removed), **green** where it is only in the new one (B, added). A one-pixel tolerance hides edge rounding between exports.
+- **Holes** are compared as a list: added, removed, **moved** (with the distance), **resized** (e.g. *1.100 mm → 1.200 mm*) or plating changed.
+- **Parts** (when both versions have pick-and-place or ODB++ component data): added, removed, moved, rotated, value or footprint changed.
+- **Offset between exports**: if B was exported with a different origin, the offset is found from the pads and removed, and the panel says by how much.
+- **Change list**: every changed area with its size and position, largest first. Click one to zoom to it. Thin differences under 0.1 mm wide (typical of re-poured copper) are coloured on the board but not listed, so they do not bury the real changes.
+- **Blink A/B** flips between the two versions automatically; **Space** flips by hand. **Hide unchanged** (or **H**) leaves only the changes; **F** fits the board; **Esc** closes.
 
 ### Fab check
 
@@ -127,6 +139,20 @@ If the `.WHL` file is missing, the old layers are listed with a note asking for 
 
 The conversion only affects what the viewer shows; your files are not changed. To send old EAGLE data to a fab, convert it to RS-274X with your CAD tool first.
 
+### ODB++
+
+Drop an ODB++ job as a `.tgz` / `.tar` / `.tar.gz`, a `.zip` or its folder. Files stored inside the job with Unix `compress` (`.Z`) are unpacked too. The job is converted in memory into RS-274X Gerbers, Excellon drill files and a pick-and-place file, which then behave like any other files (layer cards, 3D, fab check, export):
+
+- **Layers** come from `matrix/matrix`: copper (top, bottom and inner, in stack order; negative plane layers are inverted), solder mask, silkscreen and paste, each on its side. Altium jobs that keep the silkscreen on a mechanical "legend" layer (e.g. `M1_TOP-LGD`) are recognised.
+- **Board outline** from the step's `profile`, including arcs and cutouts.
+- **Features**: lines, arcs, pads and filled surfaces with holes; standard symbols (round, square, rectangle, rounded and chamfered rectangle, oval, diamond, octagon, hexagon, triangle, ellipse, round and square donut, thermals) and user-defined symbols; pad rotation and mirroring; negative (clear) features; text from the job's stroke font.
+- **Drills** from the drill layers, split into plated and non-plated by the layer name or the `.drill` attribute; slots are kept.
+- **Nets and pins** from `eda/data`, so hovering and net highlighting work even though the job has no Gerber X2 attributes.
+- **Components** from `comp_+_top` / `comp_+_bot`, with their real package size from the package outline. Unnamed footprints and one-pin "other" footprints (edge pads, fiducials, logos, mounting holes) are left out.
+- The board step is picked automatically (a panel step with step-and-repeat is skipped). Layers that are not drawn (assembly, courtyard, documentation, drill drawings) are listed in one entry.
+
+A notice after loading summarises the job: source tool, step, layer, hole and component counts and anything that needs checking.
+
 ### Excellon drill
 
 - Metric and inch, leading and trailing zero formats, decimal coordinates
@@ -146,7 +172,7 @@ The conversion only affects what the viewer shows; your files are not changed. T
 
 Each file's layer is detected automatically, in this order:
 
-1. **File content**: old EAGLE RS-274D sets are recognised and converted first (see above), then Excellon headers (`M48`), then the Gerber X2 `FileFunction` attribute, then pick-and-place column headers.
+1. **File content**: ODB++ jobs and old EAGLE RS-274D sets are recognised and converted first (see above), then Excellon headers (`M48`), then the Gerber X2 `FileFunction` attribute, then pick-and-place column headers.
 2. **File name**, using common CAD conventions:
 
 | Layer | KiCad | Altium / Protel | EAGLE |
@@ -201,7 +227,9 @@ Toolbar: **2D | 3D**, **Style** (Layers / Realistic), **Iso**, **Top**, **Bottom
 - **Binary drill files**: Altium's binary EIA `.DRL` cannot be read; use the ASCII NC drill file (`.TXT`) from the same export.
 - **Texture resolution**: this is limited by your GPU (usually 4096 px across the longest board side). Very large boards show less fine detail. While you drag a slider or color on a large board, a quicker lower-resolution preview is shown and the sharp version follows when you stop.
 - **Components are approximate**: parts are simple boxes sized from the package name, not real 3D models. Pin headers and connectors are drawn as their low plastic body.
-- **Nested zips**: a zip inside a zip is not opened (it is listed with a note). Extract it first.
+- **Nested zips**: a zip inside a zip is not opened (it is listed with a note). Extract it first. A `.tgz` inside a zip is opened.
+- **ODB++**: blind and buried drill spans are drawn as through-holes, barcodes are skipped, and thermals with other than four spokes are drawn as plain rings. Components are boxes from the package outline, not 3D models.
+- **Compare**: each layer is compared on a grid of up to 40 pixels per mm (25 µm), less on very large boards, so differences smaller than that are not seen. Only a pure offset between the two exports is corrected, not rotation or mirroring. Very different copper pours (e.g. a board re-poured in another tool) produce many small changes.
 - **Legacy EAGLE RS-274D**: only EAGLE's default 2.3 inch coordinate format is supported, and the `.WHL` file is required. Bottom-layer and drill alignment is found by matching pads, so a set with very few through-hole pads may not line up. Check the notice after loading. Hole plating is inferred from whether the hole sits on a copper pad.
 
 ## Third-party libraries

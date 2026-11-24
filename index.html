@@ -124,6 +124,32 @@ input[type=range]{accent-color:var(--accent);width:120px}
 .info{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12px;margin:0}
 .info dt{color:var(--muted)} .info dd{margin:0;font-variant-numeric:tabular-nums}
 main{flex:1;position:relative;min-width:0}
+#cmpView{position:absolute;inset:0;z-index:30;background:var(--bg);display:flex;flex-direction:column}
+#cmpView[hidden]{display:none}
+.cmp-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel)}
+.cmp-bar select{max-width:280px}
+.cmp-bar button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.cmp-legend{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:12px;margin:0 4px}
+.cmp-legend .cmp-dot{margin-left:6px}
+.cmp-chk{display:flex;align-items:center;gap:5px;font-size:13px}
+.cmp-body{flex:1;display:flex;min-height:0}
+.cmp-stage{flex:1;position:relative;min-width:0;overflow:hidden;background:var(--scene, var(--bg))}
+#cmpCanvas{position:absolute;inset:0;cursor:grab;touch-action:none}
+#cmpCanvas:active{cursor:grabbing}
+.cmp-tag{position:absolute;left:12px;top:12px;background:var(--glass);border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:13px;font-weight:600}
+.cmp-pos{position:absolute;right:12px;bottom:10px;background:var(--glass);border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:12px;font-variant-numeric:tabular-nums}
+.cmp-list{width:300px;flex:none;overflow:auto;border-left:1px solid var(--line);background:var(--panel);padding:10px}
+.cmp-sum{padding:4px 4px 10px;border-bottom:1px solid var(--line);margin-bottom:6px;display:grid;gap:6px;font-size:13px}
+.cmp-sum .muted{font-size:12px;overflow-wrap:anywhere}
+.cmp-grp{font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:12px 4px 4px}
+.cmp-item{display:flex;gap:8px;align-items:flex-start;width:100%;text-align:left;background:none;border:0;border-radius:6px;padding:6px;color:var(--ink);cursor:pointer;font:inherit;font-size:13px}
+.cmp-item:hover{background:var(--chip)}
+.cmp-item b{display:block;font-weight:600}
+.cmp-item .muted{display:block;font-size:12px}
+.cmp-more{font-size:12px;padding:4px 6px}
+.cmp-dot{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block;margin-top:3px}
+.k-same{background:rgb(150,150,150)}.k-removed{background:rgb(229,72,77)}.k-added{background:rgb(46,160,90)}.k-changed{background:rgb(234,160,40)}
+@media (max-width:900px){.cmp-body{flex-direction:column}.cmp-list{width:auto;max-height:40%;border-left:0;border-top:1px solid var(--line)}}
 #view{position:absolute;inset:0}
 #view canvas{display:block;width:100%;height:100%;outline:none}
 #view.measuring canvas{cursor:crosshair}
@@ -204,7 +230,7 @@ kbd{display:inline-block;min-width:18px;text-align:center;padding:1px 5px;border
     <header>
       <div>
         <h1>Gerber 3D Viewer</h1>
-        <p>Drop Gerber, Excellon drill and pick-and-place files or a .zip — old EAGLE RS-274D sets with their .WHL file work too. Everything runs locally in your browser.</p>
+        <p>Drop Gerber, Excellon drill and pick-and-place files, an ODB++ job (.tgz, .zip or folder) or a .zip — old EAGLE RS-274D sets with their .WHL file work too. <b>Compare…</b> shows what changed against another version. Everything runs locally in your browser.</p>
       </div>
       <button id="themeBtn" class="small" title="Switch theme">Auto</button>
     </header>
@@ -212,6 +238,8 @@ kbd{display:inline-block;min-width:18px;text-align:center;padding:1px 5px;border
       <div class="btns">
         <label class="btn primary" for="fileInput">Open files…</label>
         <input id="fileInput" type="file" multiple hidden>
+        <label class="btn" for="cmpInput" id="cmpBtn" title="Compare the loaded board with another version (Gerber, ODB++ or zip)">Compare…</label>
+        <input id="cmpInput" type="file" multiple hidden>
         <button id="clearBtn" disabled>Clear all</button>
       </div>
 
@@ -322,6 +350,21 @@ kbd{display:inline-block;min-width:18px;text-align:center;padding:1px 5px;border
     </div>
     <div id="tip"></div>
     <div id="busy">Rendering…</div>
+    <div id="cmpView" hidden>
+      <div class="cmp-bar">
+        <b>Compare</b>
+        <select id="cmpLayer" aria-label="Layer to compare"></select>
+        <span class="cmp-legend"><span class="cmp-dot k-same"></span>same <span class="cmp-dot k-removed"></span>only in A <span class="cmp-dot k-added"></span>only in B <span class="cmp-dot k-changed"></span>changed</span>
+        <label class="cmp-chk"><input type="checkbox" id="cmpHide"> Hide unchanged</label>
+        <button id="cmpBlink" title="Flip between A and B automatically (Space flips by hand)">Blink A/B</button>
+        <button id="cmpFitBtn" title="Fit (F)">Fit</button>
+        <button id="cmpClose" title="Close (Esc)">Close</button>
+      </div>
+      <div class="cmp-body">
+        <div class="cmp-stage"><canvas id="cmpCanvas"></canvas><div id="cmpBlinkTag" class="cmp-tag" hidden></div><div id="cmpPos" class="cmp-pos"></div></div>
+        <div id="cmpList" class="cmp-list"></div>
+      </div>
+    </div>
     <div id="toast" role="status" aria-live="polite"><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
     <div class="hint" id="hint">Drag to orbit · right-drag to pan · scroll to zoom · M to measure</div>
     <div id="coords"></div>
@@ -751,6 +794,7 @@ function mapPnPCols(toks) {
     x: best('x'), y: best('y'),
     rot: find(/^(rot|rotation|angle|rotate)/), side: find(/^(layer|side|tb|placement)$/),
     pkg: find(/^(footprint|package|pattern|pkg|case|packagename)/), val: find(/^(value|val|comment|partvalue)$/),
+    len: find(/^(length|bodylength|sizex)$/), wid: find(/^(width|bodywidth|sizey)$/), hgt: find(/^(height|bodyheight|sizez)$/),
   };
   if (c.ref < 0 || c.x < 0 || c.y < 0 || c.x === c.y) return null;
   const hx = toks[c.x].toLowerCase();
@@ -786,6 +830,8 @@ function parsePnP(text, name) {
         rot: cols.rot >= 0 ? parseFloat(String(t[cols.rot]).replace(/[^\d.+-]/g, '')) || 0 : 0,
         bottom: /^\s*b/i.test(sideS),
         pkg: cols.pkg >= 0 ? t[cols.pkg] || '' : '', val: cols.val >= 0 ? t[cols.val] || '' : '',
+        dims: cols.len >= 0 && cols.wid >= 0 && parseFloat(t[cols.len]) > 0 && parseFloat(t[cols.wid]) > 0
+          ? [parseFloat(t[cols.len]), parseFloat(t[cols.wid]), cols.hgt >= 0 ? parseFloat(t[cols.hgt]) || 0 : 0] : null,
       });
     }
     if (cols.side < 0 && /(bot|bottom|back)/i.test(name)) comps.forEach(c => c.bottom = true);
@@ -1218,6 +1264,7 @@ const tmpV = new THREE.Vector3();
 let tween = null;
 function animate(t) {
   requestAnimationFrame(animate);
+  if (typeof cmp !== 'undefined' && cmp.on) return;   // the compare view covers the board: no need to draw it
   if (tween) {
     const k = Math.min(1, (t - tween.t0) / 550), e = 1 - Math.pow(1 - k, 3);
     cam.position.lerpVectors(tween.p0, tween.p1, e);
@@ -1552,7 +1599,7 @@ function buildBoard() {
     const fit = fitComps(f.parsed.comps.map(c => ({ ...c })), b, f.parsed.unitExplicit);
     f.note = fit.note; comps.push(...fit.comps);
   }
-  for (const c of comps) c.size = pkgSize(c.pkg, c.ref);
+  for (const c of comps) { const g = pkgSize(c.pkg, c.ref); c.size = c.dims ? [c.dims[0], c.dims[1], c.dims[2] > 0 ? c.dims[2] : g[2]] : g; }   // real body size when the file gives one (ODB++)
 
   // ---- snap targets for the measure tool: hole centres and pad centres
   const snap = new Map();
@@ -2835,50 +2882,1049 @@ function convertLegacyEagle(added, pending) {
   return { files, consumed: pending, msg };
 }
 
+/* =====================================================================
+   ODB++ import
+   An ODB++ job (a folder tree, usually shipped as .tgz / .tar / .zip) is converted in memory into
+   RS-274X Gerbers with X2 attributes, Excellon drill files and a pick-and-place file, which the
+   normal pipeline then reads:
+   - matrix/matrix gives every layer's type, side and order (no guessing from file names);
+   - steps/<step>/profile is the board outline;
+   - features (lines, pads, arcs, surfaces with holes, text) become Gerber draws, flashes and regions;
+     standard symbols become apertures or macros, user symbols become block apertures,
+     pad rotation / mirroring become LR / LM, negative features LPC;
+   - drill layers become Excellon (plated / non-plated from the layer name or the .drill attribute);
+   - eda/data nets and component pins become %TO.N / %TO.P attributes, so net highlighting works;
+   - comp_+_top / comp_+_bot become a pick-and-place file with real package sizes.
+   ===================================================================== */
+
+// ---------- containers: tar, gzip, Unix compress (.Z) ----------
+function odbUntar(u8) {
+  const out = [], dec = new TextDecoder('latin1');
+  let off = 0, longName = null, paxPath = null;
+  const str = (o, n) => { let s = dec.decode(u8.subarray(o, o + n)); const z = s.indexOf('\0'); return z >= 0 ? s.slice(0, z) : s; };
+  while (off + 512 <= u8.length) {
+    if (u8[off] === 0 && u8[off + 1] === 0) break;            // end-of-archive block
+    let name = str(off, 100);
+    const size = parseInt(str(off + 124, 12).trim() || '0', 8) || 0, type = String.fromCharCode(u8[off + 156] || 48);
+    const prefix = str(off + 257, 6) === 'ustar' ? str(off + 345, 155) : '';
+    if (prefix) name = prefix + '/' + name;
+    const body = u8.subarray(off + 512, off + 512 + size);
+    off += 512 + Math.ceil(size / 512) * 512;
+    if (type === 'L') { longName = str(off - Math.ceil(size / 512) * 512, size); continue; }   // GNU long name
+    if (type === 'x') { const m = dec.decode(body).match(/\d+ path=([^\n]*)\n/); if (m) paxPath = m[1]; continue; }
+    if (type === 'g') continue;
+    if (longName) { name = longName; longName = null; }
+    if (paxPath) { name = paxPath; paxPath = null; }
+    if (type === '0' || type === '\0' || type === '7') out.push({ path: name.replace(/^\.\//, ''), data: body });
+  }
+  return out;
+}
+async function odbGunzip(u8) {
+  if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack .gz files (no DecompressionStream).');
+  const s = new Blob([u8]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Uint8Array(await new Response(s).arrayBuffer());
+}
+// Unix compress (LZW, magic 1F 9D) — ODB++ allows any file inside the job to be stored as name.Z
+function odbUncompressZ(u8) {
+  if (u8[0] !== 0x1f || u8[1] !== 0x9d) return u8;
+  const maxBits = u8[2] & 0x1f, block = !!(u8[2] & 0x80);
+  const out = []; let bitPos = 3 * 8, nBits = 9, maxCode = (1 << nBits) - 1, free = block ? 257 : 256;
+  const prefix = new Int32Array(1 << maxBits), suffix = new Uint8Array(1 << maxBits), stack = new Uint8Array(1 << maxBits);
+  for (let i = 0; i < 256; i++) suffix[i] = i;
+  let old = -1, fin = 0; const total = u8.length * 8;
+  const readCode = () => {
+    if (bitPos + nBits > total) return -1;
+    let code = 0; for (let i = 0; i < nBits; i++, bitPos++) if (u8[bitPos >> 3] & (1 << (bitPos & 7))) code |= 1 << i;
+    return code;
+  };
+  let groupStart = bitPos;
+  for (;;) {
+    const code = readCode(); if (code < 0) break;
+    if (code === 256 && block) {
+      // codes are read in groups of nBits*8 bits; skip to the end of the current group before resetting
+      const g = nBits * 8; bitPos = groupStart + Math.ceil((bitPos - groupStart) / g) * g;
+      nBits = 9; maxCode = 511; free = 256; old = -1; groupStart = bitPos; continue;
+    }
+    if (old === -1) { out.push(code); old = code; fin = code; continue; }
+    let c = code, sp = 0;
+    if (c >= free) { stack[sp++] = fin; c = old; }
+    while (c >= 256) { stack[sp++] = suffix[c]; c = prefix[c]; }
+    fin = c; stack[sp++] = c;
+    while (sp) out.push(stack[--sp]);
+    if (free < (1 << maxBits)) { prefix[free] = old; suffix[free] = fin; free++; }
+    old = code;
+    if (free > maxCode && nBits < maxBits) {
+      const g = nBits * 8; bitPos = groupStart + Math.ceil((bitPos - groupStart) / g) * g; groupStart = bitPos;
+      nBits++; maxCode = (1 << nBits) - 1;
+    }
+  }
+  return Uint8Array.from(out);
+}
+const odbText = u8 => new TextDecoder('utf-8').decode(odbUncompressZ(u8));
+
+// Is this set of paths an ODB++ job? Returns the job root ('' or 'jobname/' etc.)
+function odbRoot(paths) {
+  for (const p of paths) { const m = p.match(/^(.*?)(?:^|\/)matrix\/matrix(?:\.z)?$/i); if (m) return m[1] ? m[1] + '/' : ''; }
+  return null;
+}
+
+// ---------- small parsers ----------
+function odbBlocks(text) {   // NAME { KEY=VAL ... } blocks (matrix, tools)
+  const out = []; let cur = null;
+  for (const raw of text.split(/\r?\n/)) {
+    const l = raw.trim(); if (!l || l[0] === '#') continue;
+    let m = l.match(/^(\w+)\s*\{$/); if (m) { cur = { _: m[1].toUpperCase() }; continue; }
+    if (l === '}') { if (cur) out.push(cur); cur = null; continue; }
+    m = l.match(/^([\w.]+)\s*=\s*(.*)$/); if (m && cur) cur[m[1].toUpperCase()] = m[2].trim();
+  }
+  return out;
+}
+function odbKV(text) { const o = {}; for (const l of text.split(/\r?\n/)) { const m = l.match(/^\s*([\w.]+)\s*=\s*(.*?)\s*$/); if (m) o[m[1].toUpperCase()] = m[2]; } return o; }
+function odbUnitScale(text, dflt) { const m = text.match(/^\s*U(?:NITS)?\s*[= ]\s*(MM|INCH)/im); const u = m ? m[1].toUpperCase() : dflt; return u === 'MM' ? 1 : 25.4; }
+
+// Parse a features / profile / symbol file into records with their attributes
+function odbParseFeatures(text, dfltUnit) {
+  const k = odbUnitScale(text, dfltUnit);           // coordinates -> mm
+  const symK = k === 1 ? 0.001 : 0.0254;             // symbol sizes: microns (MM) or mils (INCH) -> mm
+  const syms = [], attrNames = [], attrTexts = [], feats = [];
+  let surf = null, contour = null;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim(); if (!line || line[0] === '#') continue;
+    const semi = line.indexOf(';'), body = semi >= 0 ? line.slice(0, semi).trim() : line, attrS = semi >= 0 ? line.slice(semi + 1) : '';
+    const t = body.split(/\s+/), c = t[0];
+    if (c[0] === '$') { syms[+c.slice(1)] = { name: t[1], unitK: t[2] === 'I' ? 0.0254 : t[2] === 'M' ? 0.001 : symK }; continue; }
+    if (c[0] === '@') { attrNames[+c.slice(1)] = t[1]; continue; }
+    if (c[0] === '&') { attrTexts[+c.slice(1)] = body.slice(c.length).trim(); continue; }
+    const attrs = {};
+    if (attrS) for (const kv of attrS.split(',')) { const [a, v] = kv.split('='); if (/^\d+$/.test(a)) attrs[attrNames[+a] || a] = v ?? true; }
+    const n = i => parseFloat(t[i]) * k;
+    if (surf) {
+      if (c === 'OB') { contour = { hole: t[3] === 'H', segs: [{ t: 'M', x: n(1), y: n(2) }] }; continue; }
+      if (c === 'OS') { contour?.segs.push({ t: 'L', x: n(1), y: n(2) }); continue; }
+      if (c === 'OC') { contour?.segs.push({ t: 'A', x: n(1), y: n(2), cx: n(3), cy: n(4), cw: /^Y/i.test(t[5]) }); continue; }
+      if (c === 'OE') { if (contour) surf.contours.push(contour); contour = null; continue; }
+      if (c === 'SE') { feats.push(surf); surf = null; continue; }
+    }
+    switch (c) {
+      case 'L': feats.push({ t: 'L', xs: n(1), ys: n(2), xe: n(3), ye: n(4), sym: +t[5], neg: t[6] === 'N', attrs }); break;
+      case 'P': {
+        const o = +t[6] || 0; let rot = 0, mir = false;
+        if (o >= 8) { rot = parseFloat(t[7]) || 0; mir = o === 9; } else { rot = (o % 4) * 90; mir = o >= 4; }
+        feats.push({ t: 'P', x: n(1), y: n(2), sym: +t[3], neg: t[4] === 'N', rot, mir, attrs }); break;
+      }
+      case 'A': feats.push({ t: 'A', xs: n(1), ys: n(2), xe: n(3), ye: n(4), cx: n(5), cy: n(6), sym: +t[7], neg: t[8] === 'N', cw: /^Y/i.test(t[10]), attrs }); break;
+      case 'S': surf = { t: 'S', neg: t[1] === 'N', contours: [], attrs }; break;
+      case 'T': {
+        const m = body.match(/^T\s+(\S+)\s+(\S+)\s+(\S+)\s+([PN])\s+(\d)\s+(.*)$/); if (!m) { feats.push({ t: 'X' }); break; }
+        const o = +m[5]; let rest = m[6].trim(), rot = (o % 4) * 90, mir = o >= 4;
+        if (o >= 8) { const r = rest.match(/^(\S+)\s+(.*)$/); rot = parseFloat(r[1]) || 0; mir = o === 9; rest = r[2]; }
+        const r2 = rest.match(/^(\S+)\s+(\S+)\s+(\S+)\s+'(.*)'\s*(\S*)$/);
+        if (!r2) { feats.push({ t: 'X' }); break; }
+        feats.push({ t: 'T', x: parseFloat(m[1]) * k, y: parseFloat(m[2]) * k, neg: m[4] === 'N', rot, mir,
+          xs: parseFloat(r2[1]) * k, ys: parseFloat(r2[2]) * k, wf: parseFloat(r2[3]) || 1, str: r2[4], ver: r2[5], attrs }); break;
+      }
+      case 'B': feats.push({ t: 'X', kind: 'barcode' }); break;
+      default: break;   // UNITS, ID, F (feature count) etc.
+    }
+  }
+  return { syms, feats, attrNames, attrTexts };
+}
+
+// ---------- symbols -> Gerber apertures ----------
+// Returns { def: '%ADD..%' body after the D-code, macro?: '%AM..%' text, round?: diameter, square?: size } or null
+function odbSymbolShape(name, k) {
+  const N = s => parseFloat(s) * k, f = v => (+v).toFixed(6).replace(/\.?0+$/, '') || '0';
+  let m;
+  if ((m = name.match(/^r([\d.]+)$/))) return { std: `C,${f(N(m[1]))}`, round: N(m[1]) };
+  if ((m = name.match(/^s([\d.]+)$/))) return { std: `R,${f(N(m[1]))}X${f(N(m[1]))}`, rect: [N(m[1]), N(m[1])] };
+  if ((m = name.match(/^rect([\d.]+)x([\d.]+)$/))) return { std: `R,${f(N(m[1]))}X${f(N(m[2]))}`, rect: [N(m[1]), N(m[2])] };
+  if ((m = name.match(/^rect([\d.]+)x([\d.]+)xr([\d.]+)(?:x(\d+))?$/))) {
+    const w = N(m[1]), h = N(m[2]), r = Math.min(N(m[3]), w / 2, h / 2), corners = m[4] || '1234';
+    // corners: 1 = top right, 2 = top left, 3 = bottom left, 4 = bottom right
+    const P = ['21,1,' + f(w) + ',' + f(h - 2 * r) + ',0,0,0', '21,1,' + f(w - 2 * r) + ',' + f(h) + ',0,0,0'];
+    const C = { 1: [w / 2 - r, h / 2 - r], 2: [-w / 2 + r, h / 2 - r], 3: [-w / 2 + r, -h / 2 + r], 4: [w / 2 - r, -h / 2 + r] };
+    for (const q of '1234') {
+      if (corners.includes(q)) P.push(`1,1,${f(2 * r)},${f(C[q][0])},${f(C[q][1])}`);
+      else P.push(`21,1,${f(r)},${f(r)},${f(C[q][0] + Math.sign(C[q][0]) * r / 2)},${f(C[q][1] + Math.sign(C[q][1]) * r / 2)},0`);
+    }
+    return { macro: P };
+  }
+  if ((m = name.match(/^rect([\d.]+)x([\d.]+)xc([\d.]+)(?:x(\d+))?$/))) {
+    const w = N(m[1]), h = N(m[2]), c = Math.min(N(m[3]), w / 2, h / 2), corners = m[4] || '1234', pts = [];
+    const add = (q, a, b) => { if (corners.includes(q)) pts.push(...a); else pts.push(b); };
+    add('1', [[w / 2 - c, h / 2], [w / 2, h / 2 - c]], [w / 2, h / 2]);  // walk clockwise from the top edge
+    add('4', [[w / 2, -h / 2 + c], [w / 2 - c, -h / 2]], [w / 2, -h / 2]);
+    add('3', [[-w / 2 + c, -h / 2], [-w / 2, -h / 2 + c]], [-w / 2, -h / 2]);
+    add('2', [[-w / 2, h / 2 - c], [-w / 2 + c, h / 2]], [-w / 2, h / 2]);
+    return { macro: [odbOutline(pts, f)] };
+  }
+  if ((m = name.match(/^oval([\d.]+)x([\d.]+)$/))) return { std: `O,${f(N(m[1]))}X${f(N(m[2]))}`, rect: [N(m[1]), N(m[2])] };
+  if ((m = name.match(/^di([\d.]+)x([\d.]+)$/))) { const w = N(m[1]) / 2, h = N(m[2]) / 2; return { macro: [odbOutline([[0, h], [w, 0], [0, -h], [-w, 0]], f)] }; }
+  if ((m = name.match(/^oct([\d.]+)x([\d.]+)x([\d.]+)$/))) {
+    const w = N(m[1]) / 2, h = N(m[2]) / 2, c = N(m[3]);
+    return { macro: [odbOutline([[-w + c, h], [w - c, h], [w, h - c], [w, -h + c], [w - c, -h], [-w + c, -h], [-w, -h + c], [-w, h - c]], f)] };
+  }
+  if ((m = name.match(/^donut_r([\d.]+)x([\d.]+)$/))) return { std: `C,${f(N(m[1]))}X${f(N(m[2]))}` };
+  if ((m = name.match(/^donut_s([\d.]+)x([\d.]+)$/))) return { macro: [`21,1,${f(N(m[1]))},${f(N(m[1]))},0,0,0`, `21,0,${f(N(m[2]))},${f(N(m[2]))},0,0,0`] };
+  if ((m = name.match(/^donut_rc([\d.]+)x([\d.]+)x([\d.]+)/))) return { macro: [`21,1,${f(N(m[1]))},${f(N(m[2]))},0,0,0`, `21,0,${f(N(m[1]) - 2 * N(m[3]))},${f(N(m[2]) - 2 * N(m[3]))},0,0,0`] };
+  if ((m = name.match(/^hex_l([\d.]+)x([\d.]+)x([\d.]+)$/))) { const w = N(m[1]) / 2, h = N(m[2]) / 2, c = N(m[3]); return { macro: [odbOutline([[-w + c, h], [w - c, h], [w, 0], [w - c, -h], [-w + c, -h], [-w, 0]], f)] }; }
+  if ((m = name.match(/^hex_s([\d.]+)x([\d.]+)x([\d.]+)$/))) { const w = N(m[1]) / 2, h = N(m[2]) / 2, c = N(m[3]); return { macro: [odbOutline([[0, h], [w, h - c], [w, -h + c], [0, -h], [-w, -h + c], [-w, h - c]], f)] }; }
+  if ((m = name.match(/^tri([\d.]+)x([\d.]+)$/))) { const b = N(m[1]) / 2, h = N(m[2]) / 2; return { macro: [odbOutline([[-b, -h], [b, -h], [0, h]], f)] }; }
+  if ((m = name.match(/^el([\d.]+)x([\d.]+)$/))) { const a = N(m[1]) / 2, b = N(m[2]) / 2, pts = []; for (let i = 0; i < 36; i++) pts.push([a * Math.cos(i / 36 * 2 * Math.PI), b * Math.sin(i / 36 * 2 * Math.PI)]); return { macro: [odbOutline(pts, f)] }; }
+  if ((m = name.match(/^thr([\d.]+)x([\d.]+)x([\d.]+)x(\d+)x([\d.]+)$/))) {
+    const od = N(m[1]), id = N(m[2]), ang = parseFloat(m[3]), n = +m[4], gap = N(m[5]);
+    if (n === 4) return { macro: [`7,0,0,${f(od)},${f(id)},${f(gap)},${f(ang)}`] };
+    return { std: `C,${f(od)}X${f(id)}` };   // other spoke counts: drawn as a ring
+  }
+  if ((m = name.match(/^(?:ths|s_ths|s_tho|sr_ths|rc_ths|rc_tho|o_ths)([\d.]+)x([\d.]+)/))) return { macro: [`21,1,${f(N(m[1]))},${f(N(m[1]))},0,0,0`, `21,0,${f(N(m[2]))},${f(N(m[2]))},0,0,0`] };
+  if ((m = name.match(/^moire/))) return { std: 'C,0.001' };
+  if (/^(null|hole)/.test(name)) return { skip: true };
+  return null;
+}
+function odbOutline(pts, f) { const P = [...pts, pts[0]]; return `4,1,${pts.length},` + P.map(p => f(p[0]) + ',' + f(p[1])).join(',') + ',0'; }
+
+// ---------- one feature list -> Gerber body lines ----------
+// ctx: { ap(key, defFn) -> D-code, emitTrans(rot, mir), pol(dark), userSym(name) -> D-code|null, font, net(fi) -> {N, P}|null, notes }
+function odbFeaturesToGerber(parsed, ctx, invert) {
+  const out = [], f = v => Math.round(v * 1e6);   // %FSLAX46Y46% %MOMM%
+  const XY = (x, y) => `X${f(x)}Y${f(y)}`;
+  let lastNet = '';
+  const setNet = fi => {
+    const a = ctx.net ? ctx.net(fi) : null, key = a ? a.N + '|' + (a.P || '') : '';
+    if (key === lastNet) return;
+    if (lastNet) out.push('%TD*%');
+    if (a) { out.push(`%TO.N,${a.N}*%`); if (a.P) out.push(`%TO.P,${a.P}*%`); }
+    lastNet = key;
+  };
+  const symAp = (sym) => {
+    const s = parsed.syms[sym]; if (!s) return null;
+    const key = s.name + '@' + s.unitK;
+    return ctx.ap(key, () => {
+      const sh = odbSymbolShape(s.name, s.unitK);
+      if (sh) return sh;
+      const u = ctx.userSym(s.name);
+      if (u) return u;
+      ctx.notes.unknown.add(s.name); return { std: 'C,0.1' };
+    });
+  };
+  parsed.feats.forEach((ft, fi) => {
+    if (ft.t === 'X') { ctx.notes.skipped++; return; }
+    setNet(fi);
+    const dark = !ft.neg !== !!invert;
+    if (ft.t === 'L' || ft.t === 'A') {
+      const a = symAp(ft.sym); if (!a || a.skip) return;
+      ctx.pol(dark, out);
+      // a straight line drawn with a square / rectangle: the swept shape is the hull of the rectangle at both ends
+      if (ft.t === 'L' && a.shape?.rect) { ctx.trans(0, false, out); odbRectSweep(ft, a.shape.rect, out, XY); return; }
+      ctx.trans(0, false, out);
+      out.push(`D${a.d}*`);
+      out.push(XY(ft.xs, ft.ys) + 'D02*');
+      if (ft.t === 'L') out.push(XY(ft.xe, ft.ye) + 'D01*');
+      else out.push((ft.cw ? 'G02' : 'G03') + XY(ft.xe, ft.ye) + `I${f(ft.cx - ft.xs)}J${f(ft.cy - ft.ys)}D01*`, 'G01*');
+    } else if (ft.t === 'P') {
+      const a = symAp(ft.sym); if (!a || a.skip) return;
+      ctx.pol(dark, out);
+      ctx.trans(a.shape?.round ? 0 : ft.rot, a.shape?.round ? false : ft.mir, out);
+      out.push(`D${a.d}*`, XY(ft.x, ft.y) + 'D03*');
+    } else if (ft.t === 'S') {
+      ctx.pol(dark, out); ctx.trans(0, false, out);
+      odbSurface(ft, out, XY, f);
+    } else if (ft.t === 'T') {
+      if (!ctx.font) { ctx.notes.text++; return; }
+      ctx.pol(dark, out); ctx.trans(0, false, out);
+      odbDrawText(ft, ctx, out, XY);
+    }
+  });
+  if (lastNet) out.push('%TD*%');
+  return out;
+}
+function odbRectSweep(ft, [w, h], out, XY) {
+  const c = (x, y) => [[x - w / 2, y - h / 2], [x + w / 2, y - h / 2], [x + w / 2, y + h / 2], [x - w / 2, y + h / 2]];
+  const pts = [...c(ft.xs, ft.ys), ...c(ft.xe, ft.ye)].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], hi = [];
+  for (const p of pts) { while (lo.length > 1 && cross(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+  for (const p of pts.slice().reverse()) { while (hi.length > 1 && cross(hi[hi.length - 2], hi[hi.length - 1], p) <= 0) hi.pop(); hi.push(p); }
+  const hull = [...lo.slice(0, -1), ...hi.slice(0, -1)];
+  out.push('G36*', XY(...hull[0]) + 'D02*', ...hull.slice(1).map(p => XY(...p) + 'D01*'), XY(...hull[0]) + 'D01*', 'G37*');
+}
+// Surface: each island with its holes becomes one contour; holes join it through a zero-width cut-in
+// and run the opposite way round, so a non-zero fill leaves them open.
+function odbSurface(ft, out, XY, f) {
+  const area = segs => {   // signed area with arc midpoints, enough to tell the winding direction
+    let a = 0, px = segs[0].x, py = segs[0].y;
+    const acc = (x, y) => { a += px * y - x * py; px = x; py = y; };
+    for (const s of segs.slice(1)) {
+      if (s.t === 'A') {
+        const a0 = Math.atan2(py - s.cy, px - s.cx); let a1 = Math.atan2(s.y - s.cy, s.x - s.cx), r = Math.hypot(px - s.cx, py - s.cy);
+        let d = a1 - a0; if (s.cw) { if (d >= 0) d -= 2 * Math.PI; } else if (d <= 0) d += 2 * Math.PI;
+        for (let i = 1; i < 8; i++) acc(s.cx + r * Math.cos(a0 + d * i / 8), s.cy + r * Math.sin(a0 + d * i / 8));
+      }
+      acc(s.x, s.y);
+    }
+    return a / 2;
+  };
+  const reverse = segs => {   // same path walked backwards (arcs swap direction)
+    const r = [{ t: 'M', x: segs[segs.length - 1].x, y: segs[segs.length - 1].y }];
+    for (let i = segs.length - 1; i > 0; i--) { const s = segs[i], p = segs[i - 1]; r.push(s.t === 'A' ? { t: 'A', x: p.x, y: p.y, cx: s.cx, cy: s.cy, cw: !s.cw } : { t: 'L', x: p.x, y: p.y }); }
+    return r;
+  };
+  const emit = (segs, first) => {
+    let px = segs[0].x, py = segs[0].y;
+    out.push(XY(px, py) + (first ? 'D02*' : 'D01*'));
+    for (const s of segs.slice(1)) {
+      if (s.t === 'A') out.push((s.cw ? 'G02' : 'G03') + XY(s.x, s.y) + `I${f(s.cx - px)}J${f(s.cy - py)}D01*`, 'G01*');
+      else out.push(XY(s.x, s.y) + 'D01*');
+      px = s.x; py = s.y;
+    }
+  };
+  const groups = [];
+  for (const c of ft.contours) {
+    if (c.segs.length < 2) continue;
+    if (!c.hole || !groups.length) groups.push({ island: c.segs, holes: [] });
+    else groups[groups.length - 1].holes.push(c.segs);
+  }
+  if (!groups.length) return;
+  out.push('G36*');
+  for (const g of groups) {
+    const sIsl = Math.sign(area(g.island));
+    emit(g.island, true);
+    const start = g.island[0];
+    for (let h of g.holes) {
+      if (Math.sign(area(h)) === sIsl) h = reverse(h);
+      emit(h, false);                                             // bridge in, then around the hole
+      out.push(XY(start.x, start.y) + 'D01*');                    // and back along the same bridge
+    }
+  }
+  out.push('G37*');
+}
+// Text from the job's stroke font (fonts/standard): characters are line strokes in inches
+function odbDrawText(ft, ctx, out, XY) {
+  const F = ctx.font, sx = ft.xs / F.xsize, sy = ft.ys / F.ysize, w = Math.max(0.01, ft.wf * 0.3048);
+  const th = -ft.rot * Math.PI / 180, cs = Math.cos(th), sn = Math.sin(th), mx = ft.mir ? -1 : 1;
+  const P = (lx, ly) => { const x = lx * mx, y = ly; return [ft.x + x * cs - y * sn, ft.y + x * sn + y * cs]; };
+  const d = ctx.ap('textpen' + w.toFixed(4), () => ({ std: `C,${w.toFixed(4)}`, round: w })).d;
+  out.push(`D${d}*`);
+  [...ft.str].forEach((ch, i) => {
+    const g = F.chars[ch]; if (!g) return;
+    const ox = i * ft.xs + ft.xs / 2;   // characters sit side by side, each centred in its cell
+    for (const [x1, y1, x2, y2] of g) {
+      const a = P(ox + x1 * sx, (y1 - F.base) * sy), b = P(ox + x2 * sx, (y2 - F.base) * sy);
+      out.push(XY(...a) + 'D02*', XY(...b) + 'D01*');
+    }
+  });
+}
+function odbParseFont(text) {
+  const kv = odbKV(text), chars = {}; let cur = null, minY = Infinity;
+  for (const raw of text.split(/\r?\n/)) {
+    const l = raw.trim(); let m;
+    if ((m = l.match(/^CHAR\s(.)/))) { cur = chars[m[1]] = []; continue; }
+    if (l === 'ECHAR') { cur = null; continue; }
+    if (cur && (m = l.match(/^LINE\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)/))) { const v = m.slice(1, 5).map(Number); cur.push(v); minY = Math.min(minY, v[1], v[3]); }
+  }
+  return { xsize: parseFloat(kv.XSIZE) || 0.302, ysize: parseFloat(kv.YSIZE) || 0.302, base: Number.isFinite(minY) ? Math.min(minY, -0.1) : -0.1, chars };
+}
+
+// ---------- the job ----------
+// entries: [{ path, text }] (paths relative to the archive); returns { files:[{name,text,hint?,ignore?,legacy?}], msg }
+function convertOdb(entries, archiveName) {
+  const root = odbRoot(entries.map(e => e.path)); if (root == null) return null;
+  const byPath = new Map();
+  for (const e of entries) if (e.path.toLowerCase().startsWith(root.toLowerCase())) byPath.set(e.path.slice(root.length).toLowerCase().replace(/\.z$/, ''), e.text);
+  const get = p => byPath.get(p.toLowerCase());
+  const info = odbKV(get('misc/info') || ''), dfltUnit = (info.UNITS || 'INCH').toUpperCase();
+  const blocks = odbBlocks(get('matrix/matrix') || '');
+  const steps = blocks.filter(b => b._ === 'STEP').map(b => b.NAME.toLowerCase());
+  const layers = blocks.filter(b => b._ === 'LAYER').map(b => ({ row: +b.ROW, ctx: (b.CONTEXT || '').toUpperCase(), type: (b.TYPE || '').toUpperCase(), name: (b.NAME || '').toLowerCase(), pol: (b.POLARITY || 'POSITIVE').toUpperCase(), start: (b.START_NAME || '').toLowerCase(), end: (b.END_NAME || '').toLowerCase() })).sort((a, b) => a.row - b.row);
+  // the board step: not a panel (no step-and-repeat), with the most layer data
+  const stepScore = s => { const hdr = get(`steps/${s}/stephdr`) || ''; let n = 0; for (const p of byPath.keys()) if (p.startsWith(`steps/${s}/layers/`)) n++; return (/STEP-REPEAT|^\s*STEP\s*=/im.test(hdr) ? -1e6 : 0) + (/^(pcb|board|edit|cad|orig)/.test(s) ? 1000 : 0) + n; };
+  const step = steps.length ? steps.slice().sort((a, b) => stepScore(b) - stepScore(a))[0] : [...byPath.keys()].map(p => p.match(/^steps\/([^/]+)\//)?.[1]).find(Boolean);
+  if (!step) return { files: [{ name: archiveName, ignore: true, hint: 'ODB++ job without a step — nothing to draw.' }], msg: null };
+  const L = n => get(`steps/${step}/layers/${n}/features`);
+  const job = (info.JOB_NAME && info.JOB_NAME !== 'job' ? info.JOB_NAME : archiveName.replace(/\.(tgz|tar\.gz|tar|zip|gz)$/i, '')).replace(/[^\w.-]+/g, '_');
+  const notes = { unknown: new Set(), skipped: 0, text: 0 }, msgs = [], warn = [];
+  const font = get('fonts/standard') ? odbParseFont(get('fonts/standard')) : null;
+
+  // ---- nets and pins from eda/data
+  const netOf = new Map();   // layerName -> Map(featureIndex -> {N, P})
+  const eda = get(`steps/${step}/eda/data`) || '';
+  const compsBySide = { T: odbComponents(get(`steps/${step}/layers/comp_+_top/components`) || '', dfltUnit), B: odbComponents(get(`steps/${step}/layers/comp_+_bot/components`) || '', dfltUnit) };
+  if (eda) {
+    let lyr = [], net = null, pin = null;
+    const esc = s => String(s).replace(/[,*%\\]/g, '_');
+    for (const raw of eda.split(/\r?\n/)) {
+      const t = raw.trim().split(/\s+/); if (!t[0]) continue;
+      if (t[0] === 'LYR') lyr = t.slice(1).map(s => s.toLowerCase());
+      else if (t[0] === 'NET') { const nm = t[1] || ''; net = /^\$NONE\$$|^\$NONE|^N\/C$/i.test(nm) ? null : esc(nm); pin = null; }
+      else if (t[0] === 'SNT') {
+        pin = null;
+        if (t[1] === 'TOP' && net) {
+          const c = compsBySide[t[2]]?.list[+t[3]], tp = c?.pins[+t[4]];
+          if (c && tp != null) pin = esc(c.ref) + ',' + esc(tp);
+        }
+      } else if (t[0] === 'FID' && net && t[1] === 'C') {
+        const ln = lyr[+t[2]]; if (!ln) continue;
+        (netOf.get(ln) || netOf.set(ln, new Map()).get(ln)).set(+t[3], { N: net, P: pin });
+      }
+    }
+  }
+
+  // ---- user symbols -> block apertures (built once per job)
+  const files = [], userBlocks = new Map(), building = new Set();
+  const makeWriter = (layerName) => {
+    const aps = new Map(), defs = [], macros = []; let next = 10, curPol = true, curT = '0|false';
+    const w = {
+      ap(key, mk) {
+        if (aps.has(key)) return aps.get(key);
+        const shape = mk(); const d = next++;
+        if (shape.block) { defs.push(`%ABD${d}*%`, ...shape.block, '%AB*%'); }
+        else if (shape.macro) { macros.push(`%AMM${d}*`, ...shape.macro.map(p => p + '*'), '%'); defs.push(`%ADD${d}M${d}*%`); }
+        else if (!shape.skip) defs.push(`%ADD${d}${shape.std}*%`);
+        const r = { d, shape, skip: shape.skip }; aps.set(key, r); return r;
+      },
+      pol(dark, out) { if (dark !== curPol) { out.push(dark ? '%LPD*%' : '%LPC*%'); curPol = dark; } },
+      trans(rot, mir, out) {
+        const key = (rot % 360 + 360) % 360 + '|' + !!mir; if (key === curT) return;
+        out.push(`%LM${mir ? 'X' : 'N'}*%`, `%LR${(-rot).toFixed(3)}*%`); curT = key;   // ODB++ turns clockwise, Gerber counter-clockwise
+      },
+      userSym(name) {
+        const txt = get(`symbols/${name}/features`); if (!txt || building.has(name)) return null;
+        if (!userBlocks.has(name)) userBlocks.set(name, odbParseFeatures(txt, dfltUnit));
+        // a user symbol becomes a block aperture; its own apertures share this file's D-codes,
+        // and polarity / transforms inside the block start from the defaults and are reset at its end
+        let bp = true, bt = '0|false'; building.add(name);
+        const bctx = { ...w.ctx, net: null,
+          pol(dark, out) { if (dark !== bp) { out.push(dark ? '%LPD*%' : '%LPC*%'); bp = dark; } },
+          trans(rot, mir, out) { const key = (rot % 360 + 360) % 360 + '|' + !!mir; if (key === bt) return; out.push(`%LM${mir ? 'X' : 'N'}*%`, `%LR${(-rot).toFixed(3)}*%`); bt = key; } };
+        const body = odbFeaturesToGerber(userBlocks.get(name), bctx, false);
+        building.delete(name);
+        if (!bp) body.push('%LPD*%'); if (bt !== '0|false') body.push('%LMN*%', '%LR0*%');
+        return { block: body };
+      },
+      head: () => [...macros, ...defs],
+      tail: () => (curPol ? [] : ['%LPD*%']).concat(curT !== '0|false' ? ['%LMN*%', '%LR0*%'] : []),
+    };
+    w.ctx = { ap: w.ap, pol: w.pol, trans: w.trans, userSym: w.userSym, font, notes, net: layerName && netOf.get(layerName) ? fi => netOf.get(layerName).get(fi) : null };
+    return w;
+  };
+  const writeGerber = (lay, fileFunction, ext, extra = '') => {
+    const txt = L(lay.name); if (txt == null) return false;
+    const parsed = odbParseFeatures(txt, dfltUnit);
+    const w = makeWriter(lay.name), neg = lay.pol === 'NEGATIVE';
+    const pre = [];
+    if (neg && boardBox) {   // negative layer (planes): start from solid copper over the board
+      pre.push('G36*', `X${Math.round(boardBox[0] * 1e6)}Y${Math.round(boardBox[1] * 1e6)}D02*`, `X${Math.round(boardBox[2] * 1e6)}Y${Math.round(boardBox[1] * 1e6)}D01*`,
+        `X${Math.round(boardBox[2] * 1e6)}Y${Math.round(boardBox[3] * 1e6)}D01*`, `X${Math.round(boardBox[0] * 1e6)}Y${Math.round(boardBox[3] * 1e6)}D01*`, 'G37*');
+    }
+    const body = odbFeaturesToGerber(parsed, w.ctx, neg);
+    const text = [`G04 ${job} ${lay.name} — converted from ODB++ (${info.ODB_SOURCE || info.SAVE_APP || 'unknown source'})*`,
+      `%TF.GenerationSoftware,Gerber3DViewer,ODB++ import*%`, `%TF.FileFunction,${fileFunction}*%`, '%FSLAX46Y46*%', '%MOMM*%', '%LPD*%', 'G75*', 'G01*',
+      ...w.head(), ...pre, ...body, ...w.tail(), 'M02*'].join('\n') + '\n';
+    files.push({ name: `${job}-${lay.name}.${ext}`, text, legacy: 'from ODB++' + extra });
+    return true;
+  };
+
+  // ---- profile -> outline
+  let boardBox = null;
+  const prof = get(`steps/${step}/profile`);
+  if (prof) {
+    const p = odbParseFeatures(prof, dfltUnit), out = [], f = v => Math.round(v * 1e6);
+    let bb = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const s of p.feats.filter(x => x.t === 'S')) for (const c of s.contours) {
+      let px = c.segs[0].x, py = c.segs[0].y;
+      out.push(`X${f(px)}Y${f(py)}D02*`);
+      for (const g of c.segs) {
+        bb = [Math.min(bb[0], g.x), Math.min(bb[1], g.y), Math.max(bb[2], g.x), Math.max(bb[3], g.y)];
+        if (g.t === 'M') continue;
+        if (g.t === 'A') {
+          const r = Math.hypot(px - g.cx, py - g.cy); bb = [Math.min(bb[0], g.cx - r), Math.min(bb[1], g.cy - r), Math.max(bb[2], g.cx + r), Math.max(bb[3], g.cy + r)];
+          out.push((g.cw ? 'G02' : 'G03') + `X${f(g.x)}Y${f(g.y)}I${f(g.cx - px)}J${f(g.cy - py)}D01*`, 'G01*');
+        } else out.push(`X${f(g.x)}Y${f(g.y)}D01*`);
+        px = g.x; py = g.y;
+      }
+    }
+    if (out.length) {
+      boardBox = bb;
+      files.push({ name: `${job}-profile.GKO`, legacy: 'board outline from the ODB++ profile', text: [`G04 ${job} profile from ODB++*`, '%TF.FileFunction,Profile,NP*%', '%FSLAX46Y46*%', '%MOMM*%', 'G75*', 'G01*', '%ADD10C,0.100000*%', 'D10*', ...out, 'M02*'].join('\n') + '\n' });
+    }
+  }
+
+  // ---- layers by matrix type
+  const board = layers.filter(l => l.ctx === 'BOARD');
+  const cu = board.filter(l => /^(SIGNAL|POWER_GROUND|MIXED)$/.test(l.type));
+  const topRow = cu[0]?.row ?? 0, botRow = cu[cu.length - 1]?.row ?? 1e9;
+  const side = l => l.row <= topRow ? 'Top' : l.row >= botRow ? 'Bot' : null;
+  const used = new Set(), docSilk = [];
+  cu.forEach((l, i) => {
+    const n = i + 1, top = i === 0, bot = i === cu.length - 1 && cu.length > 1;
+    if (writeGerber(l, `Copper,L${n},${top ? 'Top' : bot ? 'Bot' : 'Inr'}${l.pol === 'NEGATIVE' ? ',Plane' : ''}`, top ? 'GTL' : bot ? 'GBL' : 'G' + i, l.pol === 'NEGATIVE' ? ' (negative plane layer)' : '')) used.add(l);
+  });
+  for (const l of board) {
+    const s = side(l); if (!s) continue;
+    const T = s === 'Top';
+    if (l.type === 'SOLDER_MASK' && writeGerber(l, `Soldermask,${s}`, T ? 'GTS' : 'GBS')) used.add(l);
+    if (l.type === 'SILK_SCREEN' && writeGerber(l, `Legend,${s}`, T ? 'GTO' : 'GBO')) used.add(l);
+    if (l.type === 'SOLDER_PASTE' && writeGerber(l, `Paste,${s}`, T ? 'GTP' : 'GBP')) used.add(l);
+  }
+  // Some exporters (e.g. Altium mechanical "legend" layers) leave the silkscreen as a document layer
+  for (const sd of ['Top', 'Bot']) {
+    if (board.some(l => l.type === 'SILK_SCREEN' && side(l) === sd)) continue;
+    const re = sd === 'Top' ? /^(?!.*bot).*(top.?(overlay|silk|legend|lgd)|(overlay|silk|legend|lgd).?top)/ : /^(?!.*top).*(bot(tom)?.?(overlay|silk|legend|lgd)|(overlay|silk|legend|lgd).?bot)/;
+    const l = layers.find(x => x.ctx !== 'BOARD' && re.test(x.name) && L(x.name));
+    if (l && writeGerber(l, `Legend,${sd}`, sd === 'Top' ? 'GTO' : 'GBO', ' (document layer used as silkscreen)')) { used.add(l); docSilk.push(l.name.toUpperCase()); }
+  }
+
+  // ---- drills
+  const holes = { P: [], N: [] }; let blind = 0;
+  for (const l of board.filter(x => x.type === 'DRILL')) {
+    const txt = L(l.name); if (txt == null) continue;
+    used.add(l);
+    const p = odbParseFeatures(txt, dfltUnit), nonPlatedLayer = /non.?plated|npth|unplated/.test(l.name);
+    if ((l.start && cu[0] && l.start !== cu[0].name && l.start !== cu[cu.length - 1].name) || (l.end && cu[0] && l.end !== cu[0].name && l.end !== cu[cu.length - 1].name)) blind++;
+    for (const ft of p.feats) {
+      const s = p.syms[ft.sym]; if (!s) continue;
+      const m = s.name.match(/^r([\d.]+)$/); if (!m) continue;
+      const d = parseFloat(m[1]) * s.unitK, drillAttr = ft.attrs['.drill'];
+      const np = nonPlatedLayer || drillAttr === '1' || /non/i.test(String(drillAttr));
+      const h = ft.t === 'L' ? { x: ft.xs, y: ft.ys, x2: ft.xe, y2: ft.ye, d } : ft.t === 'P' ? { x: ft.x, y: ft.y, d } : null;
+      if (h) holes[np ? 'N' : 'P'].push(h);
+    }
+  }
+  for (const [k, sfx] of [['P', 'PTH'], ['N', 'NPTH']]) {
+    const hs = holes[k]; if (!hs.length) continue;
+    const sizes = [...new Set(hs.map(h => h.d.toFixed(3)))].sort((a, b) => a - b);
+    const out = ['M48', `; ${sfx} drill from ODB++ ${job}`, 'METRIC,TZ', ...sizes.map((s, i) => `T${String(i + 1).padStart(2, '0')}C${s}`), '%', 'G90', 'G05'];
+    sizes.forEach((s, i) => {
+      out.push(`T${String(i + 1).padStart(2, '0')}`);
+      for (const h of hs.filter(h => h.d.toFixed(3) === s)) out.push(h.x2 == null ? `X${h.x.toFixed(4)}Y${h.y.toFixed(4)}` : `X${h.x.toFixed(4)}Y${h.y.toFixed(4)}G85X${h.x2.toFixed(4)}Y${h.y2.toFixed(4)}`);
+    });
+    out.push('M30');
+    files.push({ name: `${job}-${sfx}.DRL`, text: out.join('\n') + '\n', legacy: 'from ODB++' + (sfx === 'NPTH' ? ' (non-plated)' : '') });
+  }
+
+  // ---- components -> pick-and-place with real package sizes
+  const pkgs = odbPackages(eda, dfltUnit);
+  const rows = []; let skippedComps = 0;
+  for (const [sd, set] of Object.entries(compsBySide)) for (const c of set.list) {
+    // left out: unnamed footprints, and 'other' footprints with at most one pin (edge pads, fiducials, logos, mounting holes)
+    if (/^UNNAMED\d*$/i.test(c.ref) || (c.mount === 'other' && c.pins.length <= 1)) { skippedComps++; continue; }
+    const pk = pkgs[c.pkg] || {}, val = c.props.VALUE || c.props.Value || c.props.COMMENT || c.props.Comment || c.part;
+    const q = v => '"' + String(v ?? '').replace(/"/g, "'") + '"';
+    rows.push([q(c.ref), c.x.toFixed(4), c.y.toFixed(4), sd === 'B' ? 'Bottom' : 'Top', ((-c.rot % 360) + 360) % 360, q(val), q(pk.name || c.part),
+      pk.w ? pk.w.toFixed(3) : '', pk.h ? pk.h.toFixed(3) : '', c.height > 0 ? c.height.toFixed(3) : ''].join(','));
+  }
+  if (rows.length) files.push({ name: `${job}-pick-place.csv`, legacy: 'components from ODB++', text: ['# Units: mm', 'Designator,Mid X,Mid Y,Layer,Rotation,Comment,Footprint,Length,Width,Height', ...rows].join('\n') + '\n' });
+
+  // ---- what was not drawn
+  const notDrawn = layers.filter(l => !used.has(l) && l.type !== 'COMPONENT' && l.type !== 'DIELECTRIC' && L(l.name) != null);
+  if (notDrawn.length) files.push({ name: `${job} (${notDrawn.length} ODB++ layers not drawn)`, ignore: true, hint: 'Document / drawing layers: ' + notDrawn.map(l => l.name.toUpperCase()).join(', ') });
+
+  msgs.push(`Opened ODB++ job ${job} (${info.ODB_SOURCE || info.SAVE_APP || 'unknown tool'}, step ${step.toUpperCase()}): ${cu.length} copper layer${cu.length === 1 ? '' : 's'}, ${holes.P.length + holes.N.length} holes, ${rows.length} components`);
+  if (netOf.size) msgs.push('nets from eda/data');
+  if (docSilk.length) msgs.push(`silkscreen from document layer ${docSilk.join(', ')}`);
+  if (notes.unknown.size) warn.push('unknown symbols drawn as 0.1 mm dots: ' + [...notes.unknown].slice(0, 5).join(', '));
+  if (notes.text) warn.push(`${notes.text} text records skipped (no font in the job)`);
+  if (notes.skipped) warn.push(`${notes.skipped} barcode / unreadable records skipped`);
+  if (blind) warn.push(`${blind} blind/buried drill layer${blind > 1 ? 's' : ''} drawn as through-holes`);
+  if (skippedComps) msgs.push(`${skippedComps} non-part components (pads, fiducials, logos) left out`);
+  return { files, msg: msgs.join('; ') + (warn.length ? '. Check: ' + warn.join('; ') : '') + '.' };
+}
+
+function odbComponents(text, dfltUnit) {
+  const k = odbUnitScale(text, dfltUnit), list = [], attrNames = [], attrTexts = [];
+  let cur = null;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim(); if (!line || line[0] === '#') continue;
+    const semi = line.indexOf(';'), body = semi >= 0 ? line.slice(0, semi).trim() : line, attrS = semi >= 0 ? line.slice(semi + 1) : '';
+    const t = body.split(/\s+/);
+    if (t[0][0] === '@') { attrNames[+t[0].slice(1)] = t[1]; continue; }
+    if (t[0][0] === '&') { attrTexts[+t[0].slice(1)] = body.slice(t[0].length).trim(); continue; }
+    if (t[0] === 'CMP') {
+      const attrs = {}; for (const kv of attrS.split(',')) { const [a, v] = kv.split('='); if (/^\d+$/.test(a)) attrs[attrNames[+a] || a] = v ?? true; }
+      const mt = attrs['.comp_mount_type'];
+      cur = { pkg: +t[1], x: parseFloat(t[2]) * k, y: parseFloat(t[3]) * k, rot: parseFloat(t[4]) || 0, mirror: t[5] === 'M', ref: t[6], part: t[7] || '', props: {}, pins: [],
+        mount: mt === '0' ? 'other' : mt === '1' ? 'smt' : mt === '2' ? 'tht' : mt ? 'other2' : '', height: parseFloat(attrs['.comp_height']) * k || 0 };
+      list.push(cur);
+    } else if (t[0] === 'PRP' && cur) { const m = body.match(/^PRP\s+(\S+)\s+'(.*)'/); if (m) cur.props[m[1]] = m[2]; }
+    else if (t[0] === 'TOP' && cur) cur.pins.push(t[t.length - 1]);
+  }
+  return { list };
+}
+function odbPackages(eda, dfltUnit) {
+  const k = odbUnitScale(eda, dfltUnit), pk = []; let cur = null, inPin = false;
+  for (const raw of eda.split(/\r?\n/)) {
+    const t = raw.trim().replace(/;.*$/, '').split(/\s+/); if (!t[0]) continue;
+    if (t[0] === 'PKG') { cur = { name: t[1], bb: [t[3], t[4], t[5], t[6]].map(v => parseFloat(v) * k), ol: null }; pk.push(cur); inPin = false; continue; }
+    if (!cur) continue;
+    if (t[0] === 'PIN') { inPin = true; continue; }
+    if (inPin || cur.ol) continue;
+    // the first outline record before the pins is the package body
+    if (t[0] === 'RC') { const [x, y, w, h] = t.slice(1, 5).map(v => parseFloat(v) * k); cur.ol = [w, h]; }
+    else if (t[0] === 'CR') { const r = parseFloat(t[3]) * k; cur.ol = [2 * r, 2 * r]; }
+    else if (t[0] === 'SQ') { const s = parseFloat(t[3]) * k * 2; cur.ol = [s, s]; }
+    else if (t[0] === 'OB' || t[0] === 'OS') { cur._pts ||= []; cur._pts.push([parseFloat(t[1]) * k, parseFloat(t[2]) * k]); }
+    else if (t[0] === 'OE' && cur._pts) { const xs = cur._pts.map(p => p[0]), ys = cur._pts.map(p => p[1]); cur.ol = [Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)]; }
+  }
+  return pk.map(p => { const [w, h] = p.ol || [p.bb[2] - p.bb[0], p.bb[3] - p.bb[1]]; return { name: p.name, w: w > 0 ? w : 0, h: h > 0 ? h : 0 }; });
+}
+
+// .tgz / .tar / .tar.gz: unpack in the browser; members keep their paths so ODB++ jobs can be recognised
+async function readTarArchive(u8, name) {
+  if (u8[0] === 0x1f && u8[1] === 0x8b) u8 = await odbGunzip(u8);
+  const isTar = u8.length > 512 && new TextDecoder('latin1').decode(u8.subarray(257, 262)) === 'ustar' || /\.(tar|tgz|tar\.gz)$/i.test(name);
+  if (!isTar) return [{ name: name.replace(/\.gz$/i, ''), text: odbText(u8) }];
+  const out = [];
+  for (const e of odbUntar(u8)) {
+    const nm = e.path.split('/').pop(); if (!nm || /(^|\/)(__MACOSX|\.)/.test(e.path)) continue;
+    if (e.data.length > 60e6) { out.push({ name: nm, skip: `Too large (${(e.data.length / 1e6).toFixed(0)} MB) — files over 60 MB are skipped.` }); continue; }
+    if (/\.(pdf|png|jpe?g|gbrjob|json|rpt|html?|md|xlsx?|step|stp|tgz|zip)$/i.test(nm)) continue;
+    out.push({ name: nm, path: e.path, archive: name, text: odbText(e.data) });
+  }
+  return out;
+}
+/* =====================================================================
+   Compare two versions of a fab package
+   The loaded board is version A; "Compare with…" reads version B with the same loader (Gerber,
+   ODB++, old EAGLE, zips). Each layer of both versions is drawn onto one pixel grid:
+     grey = identical, red = only in A (removed), green = only in B (added);
+   a one-pixel tolerance hides edge rounding. Holes and parts are compared as lists.
+   A pure offset between the exports is found from the pads and removed first.
+   ===================================================================== */
+const cmpEsc = s => String(s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+const CMP_ORDER = ['top-silk', 'top-paste', 'top-mask', 'top-copper', 'inner', 'bottom-copper', 'bottom-mask', 'bottom-paste', 'bottom-silk', 'outline'];
+const cmp = { on: false, A: null, B: null, nameA: '', nameB: '', layers: [], sel: null, shift: [0, 0], view: null,
+  z: { s: 1, ox: 0, oy: 0 }, blink: null, hideSame: false, focus: null, holes: null, parts: null };
+
+function cmpSetFromFiles(files) {   // group parsed files of one version by layer
+  const ok = files.filter(f => f.parsed && !f.err && f.type !== 'ignore');
+  const byType = t => ok.filter(f => f.type === t);
+  const innerNo = f => { const m = (f.text.match(/%TF\.FileFunction,Copper,L(\d+)/) || f.name.match(/(?:in|g|ly|gp)(\d+)/i)); return m ? +m[1] : 99; };
+  const set = { ops: {}, inners: [], holes: [], comps: [], pads: [] };
+  for (const t of CMP_ORDER) if (t !== 'inner') set.ops[t] = byType(t).flatMap(f => f.parsed.ops || []);
+  set.inners = byType('inner').sort((a, b) => innerNo(a) - innerNo(b) || a.name.localeCompare(b.name)).map(f => f.parsed.ops || []);
+  for (const f of ok) {
+    if (f.type === 'drill' || f.type === 'drill-npth') for (const h of f.parsed.holes) set.holes.push({ ...h, plated: f.type === 'drill' ? h.plated : false });
+    else if (f.type === 'drill-gerber') for (const o of f.parsed.ops || []) if (o.t === 'flash' && o.dark) set.holes.push({ x: o.x, y: o.y, d: apSize(o.ap) * opScale(o), plated: !/npth|non.?plated/i.test(f.name) });
+    else if (f.type === 'pnp') set.comps.push(...f.parsed.comps);
+  }
+  for (const t of ['top-copper', 'bottom-copper']) for (const o of set.ops[t]) if (o.t === 'flash') set.pads.push([o.x, o.y]);
+  // the same hole listed twice (EasyEDA puts vias in both drill files) counts once, as on the board
+  const seen = new Set(), q = v => Math.round(v * 200);
+  set.holes = set.holes.filter(h => { const k = [q(h.x), q(h.y), q(h.d), h.x2 == null ? '' : q(h.x2) + ',' + q(h.y2)].join(','); if (seen.has(k)) return false; seen.add(k); return true; });
+  return set;
+}
+
+// Offset between the two exports, from matching pad (or hole) centres on a 0.01 mm grid
+function cmpFindShift(A, B) {
+  const pick = s => (s.pads.length >= 6 ? s.pads : s.holes.map(h => [h.x, h.y]));
+  const q = p => [Math.round(p[0] * 100), Math.round(p[1] * 100)];
+  const sample = (a, n) => a.length > n ? a.filter((_, i) => i % Math.ceil(a.length / n) === 0) : a;
+  const pa = sample(pick(A), 400).map(q), pb = sample(pick(B), 400).map(q);
+  if (pa.length < 4 || pb.length < 4) return [0, 0];
+  const score = (dx, dy) => pb.filter(p => legNear([p[0] + dx, p[1] + dy], pa, 2)).length;
+  const [dx, dy] = legVote(pb, pa, 2), s0 = score(0, 0), s1 = score(dx, dy);
+  return (dx || dy) && s1 > Math.max(s0 * 1.3, pb.length * 0.3) ? [dx / 100, dy / 100] : [0, 0];
+}
+
+async function openCompare(list) {
+  if (!state.files.some(f => f.parsed && f.type !== 'ignore')) { showToast('Load a board first, then compare it with another version.', 'OK', () => {}); return; }
+  busy.classList.add('on');
+  try {
+    const g = await gatherInput(list, []);
+    const filesB = [];
+    for (const a of g.added) {
+      if (a.skip || a.ignore || !a.text || looksBinary(a.text)) continue;
+      const f = { name: a.name, text: a.text, type: detectType(a.name, a.text) }; parseFile(f); filesB.push(f);
+    }
+    if (!filesB.some(f => f.parsed && f.type !== 'ignore' && f.type !== 'pnp')) { showToast('No Gerber, drill or ODB++ data found in that version.', 'OK', () => {}); return; }
+    cmp.A = cmpSetFromFiles(state.files); cmp.B = cmpSetFromFiles(filesB);
+    cmp.nameA = state.setName || 'Loaded board'; cmp.nameB = g.setName || 'Version B';
+    cmp.shift = cmpFindShift(cmp.A, cmp.B);
+    cmpBuild();
+    cmp.on = true; document.getElementById('cmpView').hidden = false;
+    cmpFit(); cmpRenderList(); cmpDraw();
+  } finally { busy.classList.remove('on'); }
+}
+function closeCompare() { cmp.on = false; document.getElementById('cmpView').hidden = true; cmp.layers = []; cmp.A = cmp.B = null; cmp.blink = null; }
+
+function cmpBuild() {
+  const [sx, sy] = cmp.shift, B = cmp.B;
+  const shiftOps = ops => (sx || sy) ? ops.map(o => shiftOp(o, sx, sy)) : ops;
+  for (const t in B.ops) B.ops[t] = shiftOps(B.ops[t]);
+  B.inners = B.inners.map(shiftOps);
+  B.holes = B.holes.map(h => ({ ...h, x: h.x + sx, y: h.y + sy, ...(h.x2 != null ? { x2: h.x2 + sx, y2: h.y2 + sy } : {}) }));
+  B.comps = B.comps.map(c => ({ ...c, x: c.x + sx, y: c.y + sy }));
+  // common pixel grid over both versions
+  const bb = [Infinity, Infinity, -Infinity, -Infinity];
+  const grow = b => { if (!b || !isFinite(b[0])) return; bb[0] = Math.min(bb[0], b[0]); bb[1] = Math.min(bb[1], b[1]); bb[2] = Math.max(bb[2], b[2]); bb[3] = Math.max(bb[3], b[3]); };
+  for (const S of [cmp.A, B]) { for (const t in S.ops) if (S.ops[t].length) grow(opsBounds(S.ops[t])); S.inners.forEach(o => o.length && grow(opsBounds(o))); S.holes.forEach(h => grow([h.x - h.d, h.y - h.d, h.x + h.d, h.y + h.d])); }
+  if (!isFinite(bb[0])) bb.splice(0, 4, 0, 0, 10, 10);
+  const m = 1, w = bb[2] - bb[0] + 2 * m, h = bb[3] - bb[1] + 2 * m;
+  const s = Math.max(4, Math.min(40, Math.sqrt(6e6 / (w * h))));   // up to 40 px/mm (25 µm), at most ~6 Mpx per layer
+  cmp.view = { minX: bb[0] - m, maxY: bb[3] + m, s, W: Math.ceil(w * s), H: Math.ceil(h * s), w, h };
+  // layers present in either version
+  cmp.layers = [];
+  for (const t of CMP_ORDER) {
+    if (t === 'inner') {
+      const n = Math.max(cmp.A.inners.length, B.inners.length);
+      for (let i = 0; i < n; i++) cmp.layers.push({ key: 'inner' + i, label: `Inner copper ${i + 1}`, a: cmp.A.inners[i] || [], b: B.inners[i] || [] });
+    } else if (cmp.A.ops[t].length || B.ops[t].length) cmp.layers.push({ key: t, label: TYPES[t].label, a: cmp.A.ops[t], b: B.ops[t] });
+  }
+  for (const L of cmp.layers) cmpDiffLayer(L);
+  cmp.holes = cmpDiffHoles(cmp.A.holes, B.holes);
+  cmp.parts = (cmp.A.comps.length || B.comps.length) ? cmpDiffParts(cmp.A.comps, B.comps) : null;
+  const first = cmp.layers.find(L => L.regions.length) || cmp.layers[0];
+  cmp.sel = cmp.holes.changes.length && !cmp.layers.some(L => L.regions.length) ? 'holes' : first?.key;
+}
+
+function cmpDiffLayer(L) {
+  const v = cmp.view, W = v.W, H = v.H, N = W * H;
+  const mask = ops => {
+    const c = makeCanvas(W, H); if (ops.length) renderOps(c.getContext('2d'), ops, v);
+    const d = c.getContext('2d').getImageData(0, 0, W, H).data, m = new Uint8Array(N);
+    for (let i = 0; i < N; i++) m[i] = d[i * 4 + 3] > 127 ? 1 : 0;
+    return m;
+  };
+  const A = mask(L.a), B = mask(L.b);
+  const dil = m => {   // 1 px (3x3) dilation: edge rounding between exports is not a change
+    const o = new Uint8Array(N);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x; if (!m[i]) continue;
+      for (let dy = -1; dy <= 1; dy++) { const yy = y + dy; if (yy < 0 || yy >= H) continue; for (let dx = -1; dx <= 1; dx++) { const xx = x + dx; if (xx >= 0 && xx < W) o[yy * W + xx] = 1; } }
+    }
+    return o;
+  };
+  const dA = dil(A), dB = dil(B), st = new Uint8Array(N);   // 0 empty, 1 same, 2 removed (A only), 3 added (B only)
+  let same = 0, rem = 0, add = 0;
+  for (let i = 0; i < N; i++) {
+    if (A[i] && !dB[i]) { st[i] = 2; rem++; }
+    else if (B[i] && !dA[i]) { st[i] = 3; add++; }
+    else if (A[i] || B[i]) { st[i] = 1; same++; }
+  }
+  L.state = st; L.A = A; L.B = B; L.counts = { same, rem, add };
+  L.regions = cmpRegions(st, W, H, v, L);
+  L.img = null;   // coloured image built on demand
+}
+// Group changed pixels into regions on a ~0.4 mm cell grid (8-connected), so the list names places, not pixels
+function cmpRegions(st, W, H, v, L) {
+  // Thin slivers (re-poured copper, slightly different clearances) are coloured on the board but not listed:
+  // the changed mask is eroded by ~0.05 mm first, which removes anything thinner than ~0.1 mm
+  const N = W * H, e = Math.max(1, Math.round(0.05 * v.s)), ch = new Uint8Array(N), tmp = new Uint8Array(N), er = new Uint8Array(N);
+  for (let i = 0; i < N; i++) ch[i] = st[i] >= 2 ? 1 : 0;
+  for (let y = 0; y < H; y++) { let run = 0; const r = y * W;      // horizontal erosion: keep pixels with e changed neighbours each side
+    for (let x = 0; x < W; x++) { run = ch[r + x] ? run + 1 : 0; if (run >= 2 * e + 1) tmp[r + x - e] = 1; } }
+  for (let x = 0; x < W; x++) { let run = 0;
+    for (let y = 0; y < H; y++) { run = tmp[y * W + x] ? run + 1 : 0; if (run >= 2 * e + 1) er[(y - e) * W + x] = 1; } }
+  // grow the eroded mask back (opening): what it does not cover again was a thin sliver, not the rim of a real change
+  const op = new Uint8Array(N); tmp.fill(0);
+  for (let y = 0; y < H; y++) { const r = y * W; let last = -1e9; for (let x = 0; x < W; x++) { if (er[r + x]) last = x; if (x - last <= e) tmp[r + x] = 1; } last = 1e9; for (let x = W - 1; x >= 0; x--) { if (er[r + x]) last = x; if (last - x <= e) tmp[r + x] = 1; } }
+  for (let x = 0; x < W; x++) { let last = -1e9; for (let y = 0; y < H; y++) { if (tmp[y * W + x]) last = y; if (y - last <= e) op[y * W + x] = 1; } last = 1e9; for (let y = H - 1; y >= 0; y--) { if (tmp[y * W + x]) last = y; if (last - y <= e) op[y * W + x] = 1; } }
+  let thin = 0; for (let i = 0; i < N; i++) if (ch[i] && !op[i]) thin++;
+  if (L) L.thin = thin / (v.s * v.s);
+  const cs = Math.max(3, Math.round(0.4 * v.s)), CW = Math.ceil(W / cs), CH = Math.ceil(H / cs);
+  const cnt = new Uint16Array(CW * CH * 2);
+  for (let y = 0; y < H; y++) { const cy = (y / cs) | 0; for (let x = 0; x < W; x++) { const i = y * W + x, s = st[i]; if (s >= 2 && er[i]) cnt[(cy * CW + ((x / cs) | 0)) * 2 + (s - 2)]++; } }
+  const minPx = 3, seen = new Uint8Array(CW * CH), out = [];
+  for (let c = 0; c < CW * CH; c++) {
+    if (seen[c] || cnt[c * 2] + cnt[c * 2 + 1] < minPx) continue;
+    const stack = [c]; seen[c] = 1; let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1, r = 0, a = 0;
+    while (stack.length) {
+      const k = stack.pop(), cx = k % CW, cy = (k / CW) | 0;
+      r += cnt[k * 2]; a += cnt[k * 2 + 1]; x0 = Math.min(x0, cx); y0 = Math.min(y0, cy); x1 = Math.max(x1, cx); y1 = Math.max(y1, cy);
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = cx + dx, ny = cy + dy; if (nx < 0 || ny < 0 || nx >= CW || ny >= CH) continue;
+        const n = ny * CW + nx; if (!seen[n] && cnt[n * 2] + cnt[n * 2 + 1] >= minPx) { seen[n] = 1; stack.push(n); }
+      }
+    }
+    const px2mm = p => p / v.s;
+    out.push({ kind: r && a ? 'changed' : r ? 'removed' : 'added', area: (r + a) / (v.s * v.s),
+      bx: [v.minX + px2mm(x0 * cs), v.maxY - px2mm((y1 + 1) * cs), v.minX + px2mm((x1 + 1) * cs), v.maxY - px2mm(y0 * cs)] });
+  }
+  return out.sort((p, q) => q.area - p.area);
+}
+
+function cmpDiffHoles(HA, HB) {
+  const key = (x, y) => Math.floor(x) + ',' + Math.floor(y), grid = new Map();
+  HB.forEach((h, i) => { const k = key(h.x, h.y); (grid.get(k) || grid.set(k, []).get(k)).push(i); });
+  const usedB = new Set(), same = [], changes = [];
+  const near = (h, tol) => { let best = -1, bd = tol; const gx = Math.floor(h.x), gy = Math.floor(h.y);
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const i of grid.get((gx + dx) + ',' + (gy + dy)) || []) {
+      if (usedB.has(i)) continue; const b = HB[i], d = Math.hypot(b.x - h.x, b.y - h.y); if (d <= bd) { bd = d; best = i; } }
+    return best; };
+  const remA = [];
+  for (const h of HA) {
+    const i = near(h, 0.02); if (i < 0) { remA.push(h); continue; }
+    usedB.add(i); const b = HB[i];
+    if (Math.abs(b.d - h.d) > 0.005) changes.push({ kind: 'resized', a: h, b, x: h.x, y: h.y, txt: `${fmtL(h.d)} → ${fmtL(b.d)}` });
+    else if (!!b.plated !== !!h.plated) changes.push({ kind: 'plating', a: h, b, x: h.x, y: h.y, txt: `${h.plated ? 'plated' : 'non-plated'} → ${b.plated ? 'plated' : 'non-plated'}` });
+    else same.push(h);
+  }
+  for (const h of remA) {   // a removed hole with an added one of the same size close by has moved
+    const i = near(h, 1.0), b = i >= 0 ? HB[i] : null;
+    if (b && Math.abs(b.d - h.d) <= 0.005) { usedB.add(i); changes.push({ kind: 'moved', a: h, b, x: h.x, y: h.y, txt: `${fmtL(h.d)} moved ${fmtL(Math.hypot(b.x - h.x, b.y - h.y))}` }); }
+    else changes.push({ kind: 'removed', a: h, x: h.x, y: h.y, txt: fmtL(h.d) + (h.x2 != null ? ' slot' : '') });
+  }
+  HB.forEach((b, i) => { if (!usedB.has(i)) changes.push({ kind: 'added', b, x: b.x, y: b.y, txt: fmtL(b.d) + (b.x2 != null ? ' slot' : '') }); });
+  return { same, changes };
+}
+function cmpDiffParts(CA, CB) {
+  const mb = new Map(CB.map(c => [c.ref, c])), seen = new Set(), changes = [];
+  for (const a of CA) {
+    const b = mb.get(a.ref); if (!a.ref) continue;
+    if (!b) { changes.push({ kind: 'removed', a, x: a.x, y: a.y, txt: `${a.ref}${a.val ? ' (' + a.val + ')' : ''}` }); continue; }
+    seen.add(a.ref);
+    const what = [];
+    const dpos = Math.hypot(b.x - a.x, b.y - a.y); if (dpos > 0.05) what.push(`moved ${fmtL(dpos)}`);
+    const dr = ((b.rot - a.rot) % 360 + 540) % 360 - 180; if (Math.abs(dr) > 0.5) what.push(`rotated ${a.rot}° → ${b.rot}°`);
+    if (!!a.bottom !== !!b.bottom) what.push(b.bottom ? 'moved to bottom' : 'moved to top');
+    if ((a.val || '') !== (b.val || '')) what.push(`value ${a.val || '—'} → ${b.val || '—'}`);
+    if ((a.pkg || '') !== (b.pkg || '')) what.push(`footprint ${a.pkg || '—'} → ${b.pkg || '—'}`);
+    if (what.length) changes.push({ kind: 'changed', a, b, x: b.x, y: b.y, txt: `${a.ref}: ${what.join(', ')}` });
+  }
+  for (const b of CB) if (b.ref && !seen.has(b.ref) && !CA.some(a => a.ref === b.ref)) changes.push({ kind: 'added', b, x: b.x, y: b.y, txt: `${b.ref}${b.val ? ' (' + b.val + ')' : ''}` });
+  return { changes };
+}
+
+// ---------- drawing ----------
+const CMP_COL = { same: [150, 150, 150], removed: [229, 72, 77], added: [46, 160, 90], changed: [234, 160, 40] };
+function cmpLayerImage(L) {
+  if (L.img && L.imgKey === (cmp.hideSame ? 1 : 0) + '|' + cmp.blink) return L.img;
+  const v = cmp.view, c = makeCanvas(v.W, v.H), x = c.getContext('2d'), id = x.createImageData(v.W, v.H), d = id.data, N = v.W * v.H;
+  const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+  const sameA = cmp.hideSame ? 0 : dark ? 70 : 85;
+  for (let i = 0; i < N; i++) {
+    let col = null, a = 255;
+    if (cmp.blink) { const on = cmp.blink === 'A' ? L.A[i] : L.B[i]; if (on) { col = cmp.blink === 'A' ? [229, 72, 77] : [46, 160, 90]; a = 230; } }
+    else { const s = L.state[i]; if (s === 1) { col = CMP_COL.same; a = sameA; } else if (s === 2) col = CMP_COL.removed; else if (s === 3) col = CMP_COL.added; }
+    if (!col || !a) continue;
+    d[i * 4] = col[0]; d[i * 4 + 1] = col[1]; d[i * 4 + 2] = col[2]; d[i * 4 + 3] = a;
+  }
+  x.putImageData(id, 0, 0);
+  L.img = c; L.imgKey = (cmp.hideSame ? 1 : 0) + '|' + cmp.blink;
+  return c;
+}
+function cmpOutlineImage() {   // faint board outline under every view, for orientation
+  if (cmp.outlineImg) return cmp.outlineImg;
+  const L = cmp.layers.find(l => l.key === 'outline'), v = cmp.view, c = makeCanvas(v.W, v.H);
+  if (L) { const x = c.getContext('2d'), id = x.createImageData(v.W, v.H), d = id.data; for (let i = 0; i < v.W * v.H; i++) if (L.A[i] || L.B[i]) { d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = 128; d[i * 4 + 3] = 140; } x.putImageData(id, 0, 0); }
+  return cmp.outlineImg = c;
+}
+function cmpFit() {
+  const cv = document.getElementById('cmpCanvas'), r = cv.parentElement.getBoundingClientRect(), v = cmp.view;
+  const k = Math.min((r.width - 40) / v.W, (r.height - 40) / v.H);
+  cmp.z = { s: k, ox: (r.width - v.W * k) / 2, oy: (r.height - v.H * k) / 2 };
+}
+function cmpZoomTo(bx) {   // bx in mm: [x0, y0, x1, y1]
+  const cv = document.getElementById('cmpCanvas'), r = cv.parentElement.getBoundingClientRect(), v = cmp.view;
+  const px = [(bx[0] - v.minX) * v.s, (v.maxY - bx[3]) * v.s, (bx[2] - v.minX) * v.s, (v.maxY - bx[1]) * v.s];
+  const pad = 3 * v.s, w = px[2] - px[0] + 2 * pad, h = px[3] - px[1] + 2 * pad;
+  const k = Math.min(r.width / w, r.height / h, 24 / v.s * 4);
+  cmp.z = { s: k, ox: r.width / 2 - (px[0] + px[2]) / 2 * k, oy: r.height / 2 - (px[1] + px[3]) / 2 * k };
+  cmp.focus = bx; cmpDraw();
+}
+function cmpDraw() {
+  if (!cmp.on) return;
+  const cv = document.getElementById('cmpCanvas'), r = cv.parentElement.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px';
+  const x = cv.getContext('2d'), v = cmp.view, z = cmp.z;
+  x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, r.width, r.height);
+  x.save(); x.translate(z.ox, z.oy); x.scale(z.s, z.s);
+  x.imageSmoothingEnabled = z.s < 1;
+  x.drawImage(cmpOutlineImage(), 0, 0);
+  const M = mm => [(mm[0] - v.minX) * v.s, (v.maxY - mm[1]) * v.s];
+  const kindCol = k => `rgb(${(CMP_COL[k] || CMP_COL.changed).join(',')})`;
+  if (cmp.sel === 'holes' || cmp.sel === 'parts') {
+    const L = cmp.layers.find(l => l.key === 'top-copper') || cmp.layers[0];
+    if (L) { x.globalAlpha = 0.35; x.drawImage(cmpLayerImage(L), 0, 0); x.globalAlpha = 1; }
+    const lw = 1.5 / z.s;
+    if (cmp.sel === 'holes') {
+      if (!cmp.hideSame) { x.strokeStyle = 'rgba(140,140,140,.9)'; x.lineWidth = lw; for (const h of cmp.holes.same) { const [px, py] = M([h.x, h.y]); x.beginPath(); x.arc(px, py, h.d / 2 * v.s, 0, TAU); x.stroke(); } }
+      for (const c of cmp.holes.changes) {
+        const show = cmp.blink ? (cmp.blink === 'A' ? c.a : c.b) : null;
+        x.lineWidth = 2.5 / z.s;
+        const draw = (h, col) => { const [px, py] = M([h.x, h.y]); x.strokeStyle = col; x.beginPath(); x.arc(px, py, Math.max(h.d / 2 * v.s, 3 / z.s), 0, TAU); x.stroke(); };
+        if (cmp.blink) { if (show) draw(show, cmp.blink === 'A' ? kindCol('removed') : kindCol('added')); continue; }
+        if (c.a) draw(c.a, c.kind === 'added' ? kindCol('added') : c.kind === 'removed' ? kindCol('removed') : kindCol('changed'));
+        if (c.b && c.kind !== 'resized' && c.kind !== 'plating') draw(c.b, kindCol('added'));
+        else if (c.b && !c.a) draw(c.b, kindCol('added'));
+        else if (c.b) draw(c.b, kindCol('changed'));
+      }
+    } else if (cmp.parts) {
+      for (const c of cmp.parts.changes) {
+        const p = cmp.blink === 'A' ? c.a : cmp.blink === 'B' ? c.b : (c.b || c.a); if (!p) continue;
+        const sz = (p.dims || pkgSize(p.pkg, p.ref)), [px, py] = M([p.x, p.y]);
+        x.save(); x.translate(px, py); x.rotate(-(p.rot || 0) * Math.PI / 180);
+        x.strokeStyle = kindCol(c.kind); x.lineWidth = 2 / z.s; x.strokeRect(-sz[0] / 2 * v.s, -sz[1] / 2 * v.s, sz[0] * v.s, sz[1] * v.s); x.restore();
+      }
+    }
+  } else {
+    const L = cmp.layers.find(l => l.key === cmp.sel); if (L) x.drawImage(cmpLayerImage(L), 0, 0);
+  }
+  if (cmp.focus) {   // the change picked from the list
+    const a = M([cmp.focus[0], cmp.focus[3]]), b = M([cmp.focus[2], cmp.focus[1]]), pad = 6 / z.s;
+    x.strokeStyle = '#3b82f6'; x.lineWidth = 2 / z.s; x.setLineDash([6 / z.s, 4 / z.s]); x.strokeRect(a[0] - pad, a[1] - pad, b[0] - a[0] + 2 * pad, b[1] - a[1] + 2 * pad); x.setLineDash([]);
+  }
+  x.restore();
+  document.getElementById('cmpBlinkTag').textContent = cmp.blink ? `Showing ${cmp.blink === 'A' ? 'A: ' + cmp.nameA : 'B: ' + cmp.nameB}` : '';
+  document.getElementById('cmpBlinkTag').hidden = !cmp.blink;
+}
+
+// ---------- side list ----------
+function cmpRenderList() {
+  const sel = document.getElementById('cmpLayer'), list = document.getElementById('cmpList');
+  const n = L => L.regions.length;
+  const opts = cmp.layers.map(L => `<option value="${L.key}">${cmpEsc(L.label)}${n(L) ? ` — ${n(L)} change${n(L) > 1 ? 's' : ''}` : L.thin > 0.05 ? ' — edge differences only' : ' — same'}</option>`);
+  opts.push(`<option value="holes">Holes${cmp.holes.changes.length ? ` — ${cmp.holes.changes.length} change${cmp.holes.changes.length > 1 ? 's' : ''}` : ' — same'}</option>`);
+  if (cmp.parts) opts.push(`<option value="parts">Parts${cmp.parts.changes.length ? ` — ${cmp.parts.changes.length} change${cmp.parts.changes.length > 1 ? 's' : ''}` : ' — same'}</option>`);
+  sel.innerHTML = opts.join(''); sel.value = cmp.sel;
+  const total = cmp.layers.reduce((s, L) => s + n(L), 0) + cmp.holes.changes.length + (cmp.parts?.changes.length || 0);
+  const head = [`<div class="cmp-sum"><b>${total ? total + ' change' + (total > 1 ? 's' : '') : 'No differences found'}</b>`,
+    `<div class="muted">A: ${cmpEsc(cmp.nameA)}<br>B: ${cmpEsc(cmp.nameB)}</div>`,
+    cmp.shift[0] || cmp.shift[1] ? `<div class="muted">B was offset by ${fmtL(cmp.shift[0])}, ${fmtL(cmp.shift[1])} from A and has been lined up.</div>` : '', '</div>'];
+  const rows = [];
+  const item = (kind, title, sub, bx, key) => rows.push(`<button class="cmp-item" data-key="${key}" data-bx="${bx.map(v => v.toFixed(3)).join(',')}"><span class="cmp-dot k-${kind}"></span><span><b>${cmpEsc(title)}</b><span class="muted">${cmpEsc(sub)}</span></span></button>`);
+  const label = k => ({ removed: 'Removed', added: 'Added', changed: 'Changed', moved: 'Moved', resized: 'Resized', plating: 'Plating changed' }[k] || k);
+  for (const L of cmp.layers) {
+    if (!L.regions.length) continue;
+    rows.push(`<div class="cmp-grp">${cmpEsc(L.label)} <span class="muted">${L.regions.length}</span></div>`);
+    for (const r of L.regions.slice(0, 150)) item(r.kind, label(r.kind), `${fmtL(r.bx[2] - r.bx[0])} × ${fmtL(r.bx[3] - r.bx[1])} at ${fmtL((r.bx[0] + r.bx[2]) / 2)}, ${fmtL((r.bx[1] + r.bx[3]) / 2)}`, r.bx, L.key);
+    if (L.regions.length > 150) rows.push(`<div class="muted cmp-more">${L.regions.length - 150} smaller changes not listed</div>`);
+    if (L.thin > 0.05) rows.push(`<div class="muted cmp-more">Plus thin edge differences under 0.1 mm wide (e.g. re-poured copper), shown on the board but not listed.</div>`);
+  }
+  const pt = (c, extra) => [c.x - extra, c.y - extra, c.x + extra, c.y + extra];
+  if (cmp.holes.changes.length) {
+    rows.push(`<div class="cmp-grp">Holes <span class="muted">${cmp.holes.changes.length}</span></div>`);
+    for (const c of cmp.holes.changes.slice(0, 300)) item(c.kind === 'moved' || c.kind === 'resized' || c.kind === 'plating' ? 'changed' : c.kind, label(c.kind) + ' hole', `${c.txt} at ${fmtL(c.x)}, ${fmtL(c.y)}`, pt(c, 1), 'holes');
+  }
+  if (cmp.parts?.changes.length) {
+    rows.push(`<div class="cmp-grp">Parts <span class="muted">${cmp.parts.changes.length}</span></div>`);
+    for (const c of cmp.parts.changes.slice(0, 300)) item(c.kind, label(c.kind), c.txt, pt(c, 2), 'parts');
+  }
+  list.innerHTML = head.join('') + rows.join('');
+}
+
+// ---------- controls ----------
+function cmpInit() {
+  const $ = id => document.getElementById(id), cv = $('cmpCanvas');
+  $('cmpInput').onchange = e => { const l = [...e.target.files]; e.target.value = ''; if (l.length) openCompare(l); };
+  $('cmpClose').onclick = closeCompare;
+  $('cmpFitBtn').onclick = () => { cmp.focus = null; cmpFit(); cmpDraw(); };
+  $('cmpLayer').onchange = e => { cmp.sel = e.target.value; cmp.focus = null; cmpDraw(); };
+  $('cmpHide').onchange = e => { cmp.hideSame = e.target.checked; cmpDraw(); };
+  let timer = null;
+  const stopBlink = () => { clearInterval(timer); timer = null; $('cmpBlink').classList.remove('on'); };
+  $('cmpBlink').onclick = () => {
+    if (timer) { stopBlink(); cmp.blink = null; cmpDraw(); return; }
+    $('cmpBlink').classList.add('on'); cmp.blink = 'A'; cmpDraw();
+    timer = setInterval(() => { if (!cmp.on) { stopBlink(); return; } cmp.blink = cmp.blink === 'A' ? 'B' : 'A'; cmpDraw(); }, 700);
+  };
+  $('cmpList').onclick = e => {
+    const b = e.target.closest('.cmp-item'); if (!b) return;
+    cmp.sel = b.dataset.key; $('cmpLayer').value = cmp.sel;
+    cmpZoomTo(b.dataset.bx.split(',').map(Number));
+  };
+  // pan and zoom
+  cv.addEventListener('wheel', e => {
+    e.preventDefault();
+    const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, k = Math.exp(-e.deltaY * 0.0015), z = cmp.z;
+    const ns = Math.min(Math.max(z.s * k, 0.02), 60);
+    z.ox = mx - (mx - z.ox) * ns / z.s; z.oy = my - (my - z.oy) * ns / z.s; z.s = ns; cmpDraw();
+  }, { passive: false });
+  let drag = null;
+  cv.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, ox: cmp.z.ox, oy: cmp.z.oy }; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', e => {
+    const r = cv.getBoundingClientRect(), v = cmp.view;
+    if (drag) { cmp.z.ox = drag.ox + e.clientX - drag.x; cmp.z.oy = drag.oy + e.clientY - drag.y; cmpDraw(); }
+    if (v) { const px = (e.clientX - r.left - cmp.z.ox) / cmp.z.s, py = (e.clientY - r.top - cmp.z.oy) / cmp.z.s;
+      $('cmpPos').textContent = `X ${fmtL(v.minX + px / v.s)}  Y ${fmtL(v.maxY - py / v.s)}`; }
+  });
+  cv.addEventListener('pointerup', () => { drag = null; });
+  addEventListener('resize', () => cmp.on && cmpDraw());
+  // keys: Space flips A/B while held-free, Esc closes; other viewer shortcuts are paused while comparing
+  addEventListener('keydown', e => {
+    if (!cmp.on || /input|select|textarea/i.test(e.target.tagName)) return;
+    if (e.key === 'Escape') { if (cmp.focus) { cmp.focus = null; cmpDraw(); } else closeCompare(); }
+    else if (e.key === ' ') { stopBlink(); cmp.blink = cmp.blink === 'A' ? 'B' : 'A'; cmpDraw(); }
+    else if (e.key === 'f' || e.key === 'F') { cmp.focus = null; cmpFit(); cmpDraw(); }
+    else if (e.key === 'h' || e.key === 'H') { cmp.hideSame = !cmp.hideSame; $('cmpHide').checked = cmp.hideSame; cmpDraw(); }
+    else return;
+    e.preventDefault(); e.stopImmediatePropagation();
+  }, true);
+  addEventListener('keydown', e => { if (cmp.on && !/input|select|textarea/i.test(e.target.tagName)) e.stopImmediatePropagation(); }, true);
+}
+
 let uid = 0;
 async function addFiles(list) {
   try { await addFilesInner(list); } catch (err) { console.error(err); busy.classList.remove('on'); alert('Could not open files: ' + (err.message || err)); }
 }
 async function addFilesInner(list) {
+  const pendingLegacy = state.files.filter(f => f.legacyRaw);
+  const g = await gatherInput(list, pendingLegacy);
+  if (g.consumed.length) state.files = state.files.filter(f => !g.consumed.includes(f));
+  for (const a of g.added) {
+    if (a.skip) { state.files.push({ id: ++uid, name: a.name, text: '', type: 'ignore', hint: a.skip }); continue; }
+    if (a.ignore) { state.files.push({ id: ++uid, name: a.name, text: '', type: 'ignore', hint: a.hint, legacyRaw: a.legacyRaw }); continue; }
+    // Binary files (e.g. Altium's EIA .DRL) are listed with an explanation instead of silently dropped
+    if (looksBinary(a.text)) { state.files.push({ id: ++uid, name: a.name, text: '', type: 'ignore', binary: true }); continue; }
+    state.files.push({ id: ++uid, name: a.name, text: a.text, type: detectType(a.name, a.text), legacy: a.legacy });
+  }
+  state.setName = g.setName;
+  rebuild(true);
+  if (g.notice) showToast(g.notice, 'OK', () => {}, 15000);
+}
+function looksBinary(text) { const head = text.slice(0, 2000), ctrl = (head.match(/[\u0000-\u0008\u000e-\u001f\ufffd]/g) || []).length; return ctrl > Math.max(4, head.length * 0.05); }
+// Read dropped / picked files (zips, tar archives, folders), then convert ODB++ jobs and old EAGLE sets.
+// Used for the board itself and for the second version in Compare.
+async function gatherInput(list, pendingLegacy = []) {
   const added = [];
+  const setName = list.length === 1 ? list[0].name : (list[0]?._path || '').split('/')[0] || (list.length ? `${list.length} files` : '');
   for (const file of list) {
     if (/\.zip$/i.test(file.name)) {
       if (!window.JSZip) { alert('ZIP support needs an internet connection (JSZip).'); continue; }
       let zip;
       try { zip = await JSZip.loadAsync(file); }
       catch { added.push({ name: file.name, skip: 'Could not open this zip — it may be damaged or not a zip file.' }); continue; }
+      // entries are decompressed in parallel: JSZip yields to the browser between chunks, and
+      // reading one entry after another made jobs with many small files (ODB++) very slow
+      const jobs = [];
       for (const entry of Object.values(zip.files)) {
         if (entry.dir || /(^|\/)(__MACOSX|\.)/.test(entry.name)) continue;
         const nm = entry.name.split('/').pop();
+        if (/\.(tgz|tar|tar\.gz)$/i.test(nm)) { added.push(...await readTarArchive(await entry.async('uint8array'), nm)); continue; }
         if (/\.zip$/i.test(nm)) { added.push({ name: nm, skip: 'Zip inside a zip — extract it and drop its files.' }); continue; }
         if (/\.(pdf|png|jpe?g|gbrjob|json|rpt|html?|md|xlsx?|step|stp)$/i.test(nm)) continue;
         const sz = entry._data?.uncompressedSize || 0;
         if (sz > 60e6) { added.push({ name: nm, skip: `Too large (${(sz / 1e6).toFixed(0)} MB) — files over 60 MB are skipped.` }); continue; }
-        added.push({ name: nm, text: await entry.async('string') });
+        const slot = { name: nm, path: entry.name, archive: file.name, text: '' }; added.push(slot);
+        jobs.push(entry.async('uint8array').then(u8 => { slot.text = /\.z$/i.test(nm) ? odbText(u8) : new TextDecoder('utf-8').decode(u8); }));
       }
+      await Promise.all(jobs);
+    } else if (/\.(tgz|tar|tar\.gz|gz)$/i.test(file.name)) {
+      try { added.push(...await readTarArchive(new Uint8Array(await file.arrayBuffer()), file.name)); }
+      catch (err) { added.push({ name: file.name, skip: 'Could not open this archive: ' + (err.message || err) }); }
     } else {
       if (file.size > 60e6) { added.push({ name: file.name, skip: `Too large (${(file.size / 1e6).toFixed(0)} MB) — files over 60 MB are skipped.` }); continue; }
-      added.push({ name: file.name, text: await file.text() });
+      const path = file._path || file.webkitRelativePath || '';
+      added.push({ name: file.name, path: path || undefined, archive: path ? path.split('/').filter(Boolean)[0] : undefined,
+        text: /\.z$/i.test(file.name) ? odbText(new Uint8Array(await file.arrayBuffer())) : await file.text() });
     }
   }
+  // ODB++ jobs (one per archive or dropped folder) are converted to Gerber / Excellon / pick-and-place first
+  const odbMsgs = [];
+  for (const arch of [...new Set(added.filter(a => a.path && a.archive).map(a => a.archive))]) {
+    const group = added.filter(a => a.archive === arch && a.path && a.text != null);
+    if (odbRoot(group.map(a => a.path)) == null) continue;
+    let conv;
+    try { conv = convertOdb(group, arch); } catch (err) { console.error(err); conv = { files: [{ name: arch, ignore: true, hint: 'Could not read this ODB++ job: ' + (err.message || err) }], msg: null }; }
+    const rest = added.filter(a => a.archive !== arch);
+    added.splice(0, added.length, ...rest, ...conv.files);
+    if (conv.msg) odbMsgs.push(conv.msg);
+  }
   // Old EAGLE RS-274D sets (.CMP/.SOL/... + .WHL) are converted to RS-274X before detection
-  let legacyMsg = null;
-  const pendingLegacy = state.files.filter(f => f.legacyRaw);
+  let legacyMsg = null, consumed = [];
   const conv = convertLegacyEagle(added, pendingLegacy);
-  if (conv) {
-    state.files = state.files.filter(f => !conv.consumed.includes(f));
-    added.splice(0, added.length, ...conv.files); legacyMsg = conv.msg;
-  }
-  for (const a of added) {
-    if (a.skip) { state.files.push({ id: ++uid, name: a.name, text: '', type: 'ignore', hint: a.skip }); continue; }
-    if (a.ignore) { state.files.push({ id: ++uid, name: a.name, text: '', type: 'ignore', hint: a.hint, legacyRaw: a.legacyRaw }); continue; }
-    // Binary files (e.g. Altium's EIA .DRL) are listed with an explanation instead of silently dropped
-    const head = a.text.slice(0, 2000), ctrl = (head.match(/[\u0000-\u0008\u000e-\u001f�]/g) || []).length;
-    if (ctrl > Math.max(4, head.length * 0.05)) { state.files.push({ id: ++uid, name: a.name, text: '', type: 'ignore', binary: true }); continue; }
-    state.files.push({ id: ++uid, name: a.name, text: a.text, type: detectType(a.name, a.text), legacy: a.legacy });
-  }
-  rebuild(true);
-  if (legacyMsg) showToast(legacyMsg, 'OK', () => {}, 15000);
+  if (conv) { consumed = conv.consumed; added.splice(0, added.length, ...conv.files); legacyMsg = conv.msg; }
+  return { added, consumed, setName, notice: [legacyMsg, ...odbMsgs].filter(Boolean).join(' ') };
 }
 
 document.getElementById('fileInput').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
@@ -3159,7 +4205,7 @@ document.addEventListener('drop', e => {
   if (entries.some(en => en.isDirectory)) {
     const out = [];
     const walk = ent => new Promise(res => {
-      if (ent.isFile) ent.file(f => { out.push(f); res(); }, () => res());
+      if (ent.isFile) ent.file(f => { try { f._path = ent.fullPath.replace(/^\//, ''); } catch {} out.push(f); res(); }, () => res());
       else {
         const r = ent.createReader(), all = [];
         const read = () => r.readEntries(async es => { if (!es.length) { for (const x of all) await walk(x); res(); } else { all.push(...es); read(); } }, () => res());
@@ -3174,6 +4220,7 @@ set2D(state.is2D, true);   // opens in 2D by default; the last choice is remembe
 renderBoardRow(); renderFab();
 restoreSession();
 syncStyleSel();
+cmpInit();
 window.__viewer = { state, setView, set2D, parsePnP, pkgSize, board, cam: () => cam, netAt };
 </script>
 </body>
