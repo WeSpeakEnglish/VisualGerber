@@ -1,6 +1,7 @@
 # Gerber 3D Viewer
 
-A single-file, browser-based 2D and 3D viewer for PCB Gerber, Excellon drill and pick-and-place files.
+A single-file, browser-based 2D and 3D viewer for PCB Gerber, Excellon drill and pick-and-place files,
+including old EAGLE RS-274D sets with a `.WHL` aperture file.
 Open `index.html` in a browser, drop in your fabrication files (loose or zipped),
 and inspect the board as flat layers or as a 3D model with solder mask, surface finish, silkscreen, inner layers, drilled holes and components.
 
@@ -67,7 +68,8 @@ No installation, no build step and no server. Files are processed locally in you
 ### Files
 
 - Each file can be removed with its **×** button; **Remove ignored** drops all files that are not drawn; **Clear all** removes everything. Every removal can be undone for a few seconds.
-- Files that are loaded but not drawn (reports, aperture lists, Altium pad masters, mechanical layers, binary drill files) are listed with a short explanation. So are files that were skipped: files over 60 MB, zips inside a zip and damaged zips.
+- Files that are loaded but not drawn (reports, aperture lists, Altium pad masters, mechanical layers, binary drill files, EAGLE aperture wheels and drill racks) are listed with a short explanation.
+- Files converted from old EAGLE RS-274D data are marked *converted from RS-274D* on their card, and a notice after loading lists what was corrected. So are files that were skipped: files over 60 MB, zips inside a zip and damaged zips.
 - **Your last board reopens automatically** after a page reload, with a notice that has a **Clear** button.
 
 ### Export
@@ -95,6 +97,35 @@ Colors, opacities, style, 2D/3D choice, units, fab-check manufacturer, thickness
 - X2 file attributes (`%TF.FileFunction`) for automatic layer detection, including inner layer order
 - X2 object attributes (`%TO.N` net, `%TO.P` pad, `%TO.C` component, `%TD`) for net and pin information
 
+### Legacy EAGLE RS-274D (with `.WHL` aperture wheel)
+
+Older EAGLE CAM jobs wrote RS-274D Gerbers, which have no aperture definitions in the file. The aperture sizes are in a separate `.WHL` wheel file, and the drill file holds only tool numbers. Drop the whole set (loose or zipped) and the viewer converts it to RS-274X and Excellon in memory:
+
+| File | Used as |
+|---|---|
+| `.CMP` / `.SOL` | Top / bottom copper |
+| `.LY2`, `.LY3`… | Inner copper |
+| `.STC` / `.STS` | Top / bottom solder mask |
+| `.PLC` / `.PLS` | Top / bottom silkscreen |
+| `.CRC` / `.CRS` | Top / bottom paste |
+| `.WHL` | Aperture wheel: pad and track sizes (**required**) |
+| `.DRL` (tool numbers and `X…Y…` only) | Drill hits |
+| Drill rack (e.g. `WOM.DRL`) or drill info (`.DRI` / `DRL.DOC`) | Hole sizes |
+| `.PRT` | Hole sizes from the drill-legend texts, when no rack or info file is present |
+| `.DCC` / `.DCS` | Documentation print: used to find the board outline, not drawn |
+
+What the conversion does:
+
+- **Apertures** are taken from the `.WHL` file (draw, round, square, rectangle, oval, octagon). Coordinates are read in EAGLE's 2.3 inch format.
+- **Bottom layers** that EAGLE plotted mirrored or shifted are lined up with the top by matching pad positions.
+- **Drill file**: the right rotation, mirroring and offset are found automatically by matching the holes to the copper pads. Holes on a copper pad become plated, and the rest non-plated.
+- **Board outline** is the largest closed rectangle on the documentation, silkscreen or copper layer, written as an extra `…-outline.GKO` file.
+- **Clean-up**: graphics outside the board (drawing titles, drill legends) and crop marks lying on the board edge are removed from copper and silkscreen.
+
+If the `.WHL` file is missing, the old layers are listed with a note asking for it; they convert as soon as it is added. If a hole size cannot be found, that tool is drawn at 0.8 mm and the notice says so.
+
+The conversion only affects what the viewer shows; your files are not changed. To send old EAGLE data to a fab, convert it to RS-274X with your CAD tool first.
+
 ### Excellon drill
 
 - Metric and inch, leading and trailing zero formats, decimal coordinates
@@ -114,7 +145,7 @@ Colors, opacities, style, 2D/3D choice, units, fab-check manufacturer, thickness
 
 Each file's layer is detected automatically, in this order:
 
-1. **File content**: Excellon headers (`M48`), then the Gerber X2 `FileFunction` attribute, then pick-and-place column headers.
+1. **File content**: old EAGLE RS-274D sets are recognised and converted first (see above), then Excellon headers (`M48`), then the Gerber X2 `FileFunction` attribute, then pick-and-place column headers.
 2. **File name**, using common CAD conventions:
 
 | Layer | KiCad | Altium / Protel | EAGLE |
@@ -127,7 +158,7 @@ Each file's layer is detected automatically, in this order:
 | Bottom silkscreen | `B_Silkscreen` / `B_SilkS` | `.GBO` | `.pls` |
 | Top / bottom paste | `F_Paste` / `B_Paste` | `.GTP` / `.GBP` | `.crc` / `.crs` |
 | Outline | `Edge_Cuts` | `.GKO`, `.GM1` | `.dim` |
-| Inner copper | `In1_Cu`… | `.G1`, `.G2`… | — |
+| Inner copper | `In1_Cu`… | `.G1`, `.G2`… | `.ly2`, `.ly3`… |
 | Drill | `.drl` | `.TXT` (ASCII) | `.drd`, `.xln` |
 | Pick and place | `-pos.csv`, `.pos` | `Pick Place….txt` / `.csv` | `.mnt`, `.mnb` |
 
@@ -169,6 +200,7 @@ Toolbar: **2D | 3D**, **Style** (Layers / Realistic), **Iso**, **Top**, **Bottom
 - **Texture resolution**: this is limited by your GPU (usually 4096 px across the longest board side). Very large boards show less fine detail. While you drag a slider or color on a large board, a quicker lower-resolution preview is shown and the sharp version follows when you stop.
 - **Components are approximate**: parts are simple boxes sized from the package name, not real 3D models. Pin headers and connectors are drawn as their low plastic body.
 - **Nested zips**: a zip inside a zip is not opened (it is listed with a note). Extract it first.
+- **Legacy EAGLE RS-274D**: only EAGLE's default 2.3 inch coordinate format is supported, and the `.WHL` file is required. Bottom-layer and drill alignment is found by matching pads, so a set with very few through-hole pads may not line up. Check the notice after loading. Hole plating is inferred from whether the hole sits on a copper pad.
 
 ## Third-party libraries
 

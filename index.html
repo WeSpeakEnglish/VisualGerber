@@ -204,7 +204,7 @@ kbd{display:inline-block;min-width:18px;text-align:center;padding:1px 5px;border
     <header>
       <div>
         <h1>Gerber 3D Viewer</h1>
-        <p>Drop Gerber, Excellon drill and pick-and-place files or a .zip. Everything runs locally in your browser.</p>
+        <p>Drop Gerber, Excellon drill and pick-and-place files or a .zip — old EAGLE RS-274D sets with their .WHL file work too. Everything runs locally in your browser.</p>
       </div>
       <button id="themeBtn" class="small" title="Switch theme">Auto</button>
     </header>
@@ -2408,8 +2408,8 @@ function renderFiles() {
     if (f.err) { stt.className += ' err'; stt.textContent = 'Parse error: ' + f.err; }
     else if (ign) stt.textContent = f.hint || ignoreHint(f.name, f.binary);
     else if (f.parsed?.comps) stt.textContent = f.parsed.comps.length + ' components' + (f.note ? ' · ' + f.note : '');
-    else if (f.parsed?.holes) stt.textContent = f.parsed.holes.length + ' holes';
-    else if (f.parsed?.ops) stt.textContent = f.parsed.ops.length + ' objects' + (f.parsed.warnings?.length ? ' · ' + f.parsed.warnings.join('; ') : '')
+    else if (f.parsed?.holes) stt.textContent = f.parsed.holes.length + ' holes' + (f.legacy ? ' · ' + f.legacy : '');
+    else if (f.parsed?.ops) stt.textContent = f.parsed.ops.length + ' objects' + (f.legacy ? ' · ' + f.legacy : '') + (f.parsed.warnings?.length ? ' · ' + f.parsed.warnings.join('; ') : '')
       + (f.type === 'inner' && !lay && subOpacity() >= 0.999 && state.explode < 0.001 ? ' · visible when the board is see-through' : '');
     if (!ign && HAS_OPACITY(key)) {
       const rg = document.createElement('input'); rg.type = 'range'; rg.min = 0; rg.max = 100; rg.value = Math.round(L(key).a * 100);
@@ -2494,6 +2494,240 @@ function restyleSoon() {
   restyleTimer = setTimeout(restyle, big ? 350 : 120);
 }
 
+/* =====================================================================
+   Legacy EAGLE RS-274D support
+   Old EAGLE CAM sets (.CMP .SOL .STC .STS .PLC .PLS .CRC .CRS .LYn + .WHL
+   aperture wheel + tool-number-only .DRL + drill rack) are converted in
+   memory to RS-274X / Excellon before the normal pipeline sees them:
+   apertures come from the .WHL, bottom layers are un-mirrored, the drill
+   file is re-oriented onto the pads, hole sizes come from the rack file
+   (or the .PRT drill legend), and crop marks on the board edge are removed.
+   Coordinates are EAGLE's 2.3 inch format (1 unit = 1 mil).
+   ===================================================================== */
+const LEG_SIDE = { cmp: 'top', sol: 'bot', stc: 'top', sts: 'bot', plc: 'top', pls: 'bot', crc: 'top', crs: 'bot', dcc: 'top', dcs: 'bot' };
+const LEG_KIND = { cmp: 'cu', sol: 'cu', stc: 'mask', sts: 'mask', plc: 'silk', pls: 'silk', crc: 'paste', crs: 'paste', dcc: 'doc', dcs: 'doc' };
+function legExt(n) { const m = n.toLowerCase().match(/\.([a-z0-9]+)$/); return m ? m[1] : ''; }
+function legKind(n) { const e = legExt(n); return LEG_KIND[e] || (/^ly\d+$/.test(e) ? 'cu' : null); }
+function legSide(n) { const e = legExt(n); return LEG_SIDE[e] || 'top'; }
+function legIsRS274D(t) { const h = t.slice(0, 8000); return !/%(FS|AD|MO)/.test(h) && /D0?[123]\*/.test(h) && /(^|\*|\n)\s*(G54)?D[1-9]\d+\*/.test(h); }
+function legIsWheel(t) { return !/%AD/.test(t) && /^\s*D\d+\s+(draw|round|square|rectangle|rect|octagon|oval|circle)\s+[\d.]/im.test(t); }
+function legIsRack(t) { return !/%AD|M48/.test(t) && /^\s*T\d+\s+[\d.]+/m.test(t) && !/^\s*X-?\d+Y-?\d+/m.test(t); }
+function legIsOldDrill(t) { return !/M48|%AD|%FS/.test(t) && /^\s*T\d+\s*$/m.test(t) && /^\s*X-?\d+Y-?\d+\s*$/m.test(t); }
+function legToIn(v) { v = String(v).trim().toLowerCase(); const n = parseFloat(v); return /mm$/.test(v) ? n / 25.4 : /mils?$/.test(v) ? n / 1000 : n; }
+
+function legParseWheel(text) {
+  const ap = {};
+  for (const l of text.split(/\r?\n/)) {
+    const m = l.match(/^\s*D(\d+)\s+(\w+)\s+(.+?)\s*$/); if (!m) continue;
+    const d = m[1], t = m[2].toLowerCase(), s = m[3].replace(/;.*$/, '');
+    const two = () => s.split(/\s*x\s*/i).map(legToIn);
+    if (t === 'draw' || t === 'round' || t === 'circle') ap[d] = { t: 'C', w: legToIn(s) };
+    else if (t === 'square') ap[d] = { t: 'R', w: legToIn(s), h: legToIn(s) };
+    else if (t === 'rectangle' || t === 'rect') { const [w, h] = two(); ap[d] = { t: 'R', w, h }; }
+    else if (t === 'oval') { const [w, h] = two(); ap[d] = { t: 'O', w, h }; }
+    else if (t === 'octagon') ap[d] = { t: 'P', w: legToIn(s) };
+    else ap[d] = { t: 'C', w: legToIn(s.split(/\s+/)[0]) };
+  }
+  return ap;
+}
+function legParseGerber(text) {
+  const out = []; let cur = null, x = 0, y = 0, last = [0, 0];
+  for (let l of text.replace(/\r?\n/g, '').split('*')) {
+    l = l.trim();
+    if (!l || l[0] === '%' || /^G04/.test(l) || /^(M0[02]|G0?[14]|G7[045]|G9[01])$/.test(l)) continue;
+    l = l.replace(/^G0?1(?=[XYD])/, '');
+    let m = l.match(/^(?:G54)?D(\d+)$/);
+    if (m && +m[1] >= 10) { cur = m[1]; continue; }
+    m = l.match(/^(?:X(-?\d+))?(?:Y(-?\d+))?D0?([123])$/); if (!m) continue;
+    if (m[1] != null) x = +m[1];
+    if (m[2] != null) y = +m[2];
+    if (m[3] === '1') out.push({ d: cur, op: 1, a: last, b: [x, y] });
+    else if (m[3] === '3') out.push({ d: cur, op: 3, a: [x, y], b: [x, y] });
+    last = [x, y];
+  }
+  return out;
+}
+function legParseDrill(text) {
+  const holes = {}; let t = null;
+  for (const raw of text.split(/\r?\n/)) {
+    const l = raw.trim(); let m = l.match(/^T0*(\d+)$/);
+    if (m) { t = m[1]; holes[t] ||= []; continue; }
+    m = l.match(/^X(-?\d+)Y(-?\d+)$/); if (m && t) holes[t].push([+m[1], +m[2]]);
+  }
+  return holes;
+}
+function legParseRack(text) {   // "T1  0.020 ; 0.5mm" or "T19  4.5mm" -> mm
+  const r = {};
+  for (const l of text.split(/\r?\n/)) {
+    const m = l.match(/^\s*T0*(\d+)\s+([\d.]+)\s*(mm|in|mils?)?/i); if (!m) continue;
+    const c = l.match(/;\s*([\d.,]+)\s*mm/i);
+    r[m[1]] = c ? parseFloat(c[1].replace(',', '.')) : legToIn(m[2] + (m[3] || 'in')) * 25.4;
+  }
+  return r;
+}
+function legPrtLegend(text) {   // drill legend texts in the EAGLE part position list: "E$10   0,5MM   TEXT"
+  const s = new Set();
+  for (const l of text.split(/\r?\n/)) { const m = l.match(/^\S+\s+(\d+[,.]\d+)\s*MM\s+TEXT\b/i); if (m) s.add(parseFloat(m[1].replace(',', '.'))); }
+  return [...s].sort((a, b) => a - b);
+}
+
+const LEG_OR = { 'x,y': (x, y) => [x, y], '-x,y': (x, y) => [-x, y], 'x,-y': (x, y) => [x, -y], '-x,-y': (x, y) => [-x, -y],
+  'y,x': (x, y) => [y, x], '-y,x': (x, y) => [-y, x], 'y,-x': (x, y) => [y, -x], '-y,-x': (x, y) => [-y, -x] };
+function legNear(p, pts, tol = 3) { for (const q of pts) if (Math.abs(p[0] - q[0]) <= tol && Math.abs(p[1] - q[1]) <= tol) return true; return false; }
+function legVote(src, ref, tol = 3) {
+  const c = new Map();
+  for (const s of src) for (const r of ref) { const k = (r[0] - s[0]) + ',' + (r[1] - s[1]); c.set(k, (c.get(k) || 0) + 1); }
+  const all = [...c].map(([k, v]) => { const [x, y] = k.split(',').map(Number); return [x, y, v]; });
+  const top = all.slice().sort((a, b) => b[2] - a[2]).slice(0, 150);
+  let best = [-1, 0, 0];
+  for (const [kx, ky] of top) {
+    let sc = 0; for (const [x, y, v] of all) if (Math.abs(x - kx) <= tol && Math.abs(y - ky) <= tol) sc += v;
+    if (sc > best[0]) best = [sc, kx, ky];
+  }
+  return [best[1], best[2]];
+}
+function legBestTf(src, ref, names = Object.keys(LEG_OR)) {
+  let best = { sc: -1, n: 'x,y', dx: 0, dy: 0 };
+  if (!src.length || !ref.length) return { ...best, sc: 0 };
+  for (const n of names) {
+    const pts = src.map(p => LEG_OR[n](p[0], p[1])), [dx, dy] = legVote(pts, ref);
+    const sc = pts.filter(p => legNear([p[0] + dx, p[1] + dy], ref)).length;
+    if (sc > best.sc) best = { sc, n, dx, dy };
+  }
+  return best;
+}
+function legApplyTf(tf, p) { const q = LEG_OR[tf.n](p[0], p[1]); return [q[0] + tf.dx, q[1] + tf.dy]; }
+function legFindOutline(layers) {
+  let best = null;
+  for (const ops of layers) {
+    const segs = ops.filter(o => o.op === 1);
+    for (let i = 0; i + 3 < segs.length; i++) {
+      const s = segs.slice(i, i + 4), eq = (p, q) => p[0] === q[0] && p[1] === q[1];
+      if (!eq(s[1].a, s[0].b) || !eq(s[2].a, s[1].b) || !eq(s[3].a, s[2].b) || !eq(s[3].b, s[0].a)) continue;
+      const pts = [s[0].a, ...s.map(z => z.b)];
+      if (!s.every(z => z.a[0] === z.b[0] || z.a[1] === z.b[1])) continue;
+      const xs = [...new Set(pts.map(p => p[0]))], ys = [...new Set(pts.map(p => p[1]))];
+      if (xs.length !== 2 || ys.length !== 2) continue;
+      const box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)], area = (box[2] - box[0]) * (box[3] - box[1]);
+      if (!best || area > best.area) best = { area, box };
+    }
+  }
+  return best && best.box;
+}
+function legApDef(a) {
+  const f = v => Math.max(v, 0.0001).toFixed(5);
+  if (a.t === 'C') return 'C,' + (a.w > 0 ? f(a.w) : '0.00500');   // EAGLE 0-width = thinnest line; drawn as 5 mil
+  if (a.t === 'R') return 'R,' + f(a.w) + 'X' + f(a.h);
+  if (a.t === 'O') return 'O,' + f(a.w) + 'X' + f(a.h);
+  return 'P,' + f(a.w / Math.cos(Math.PI / 8)) + 'X8X22.5';
+}
+
+// added: [{name,text}] from this batch; pending: earlier state.files still waiting for a .WHL.
+// Returns null when there is nothing legacy, else { files, consumed, msg }.
+function convertLegacyEagle(added, pending) {
+  const pool = [...added.filter(a => !a.skip && a.text), ...pending.map(f => ({ name: f.name, text: f.legacyRaw }))];
+  const isG = a => legKind(a.name) && legIsRS274D(a.text);
+  const gbrs = pool.filter(isG), drills = pool.filter(a => legIsOldDrill(a.text));
+  if (!gbrs.length && !drills.length) return null;
+  const wheelF = pool.find(a => legIsWheel(a.text));
+  const racks = pool.filter(a => legIsRack(a.text));
+  const prt = pool.find(a => /\.prt$/i.test(a.name));
+  const legacySet = new Set([...gbrs, ...drills, ...racks, wheelF].filter(Boolean));
+  const files = added.filter(a => !legacySet.has(a));   // modern files in the same batch pass straight through
+
+  if (!wheelF) {
+    for (const a of gbrs) files.push({ name: a.name, ignore: true, legacyRaw: a.text, hint: 'Old EAGLE RS-274D Gerber — also add the .WHL aperture file from the same folder to view it.' });
+    for (const a of [...drills, ...racks]) files.push({ name: a.name, ignore: true, legacyRaw: a.text, hint: 'Old EAGLE drill data — waiting for the .WHL file and the Gerbers.' });
+    return { files, consumed: pending, msg: 'Old EAGLE RS-274D files found — add the .WHL aperture file to convert them.' };
+  }
+
+  const ap = legParseWheel(wheelF.text), notes = [], warn = [];
+  const G = new Map(gbrs.map(a => [a, legParseGerber(a.text)]));
+  const byExt = e => gbrs.find(a => legExt(a.name) === e);
+  const opsOf = e => (byExt(e) && G.get(byExt(e))) || [];
+  const missing = new Set(); for (const ops of G.values()) for (const o of ops) if (o.d && !ap[o.d]) missing.add(o.d);
+  for (const d of missing) { ap[d] = { t: 'C', w: 0.004 }; warn.push('aperture D' + d + ' not in .WHL'); }
+
+  // Bottom layers: EAGLE often plots them mirrored and shifted
+  const flashes = ops => ops.filter(o => o.op === 3).map(o => o.b);
+  const topRef = [...flashes(opsOf('cmp')), ...flashes(opsOf('stc'))];
+  const botSrc = gbrs.filter(a => legSide(a.name) === 'bot' && LEG_KIND[legExt(a.name)] !== 'doc').flatMap(a => flashes(G.get(a)));
+  let tfBot = { n: 'x,y', dx: 0, dy: 0, sc: 0 };
+  if (botSrc.length && topRef.length) {
+    tfBot = legBestTf(botSrc, topRef, ['x,y', '-x,y', 'x,-y']);
+    if (tfBot.n !== 'x,y' || tfBot.dx || tfBot.dy) notes.push(`bottom layers ${tfBot.n === 'x,y' ? 'shifted' : 'un-mirrored'} (${tfBot.sc}/${botSrc.length} pads match)`);
+  }
+  for (const a of gbrs) if (legSide(a.name) === 'bot') G.set(a, G.get(a).map(o => ({ ...o, a: legApplyTf(tfBot, o.a), b: legApplyTf(tfBot, o.b) })));
+
+  // Outline: largest closed rectangle on the documentation / silk / copper layer
+  const box = legFindOutline(['dcc', 'plc', 'cmp'].map(opsOf).filter(o => o.length));
+  const base = (byExt('cmp') || gbrs[0] || drills[0]).name.replace(/\.[^.]+$/, '');
+
+  // Drill: re-orient onto the pads, sizes from rack / legend, plating by pad hits
+  const pads = [...flashes(opsOf('cmp')), ...flashes(opsOf('sol'))];
+  const holesOut = [];
+  for (const df of drills) {
+    let holes = legParseDrill(df.text);
+    const allH = Object.values(holes).flat();
+    const tf = legBestTf(allH, pads);
+    if (tf.n !== 'x,y' || tf.dx || tf.dy) notes.push(`drill re-aligned (${tf.sc}/${allH.length} holes on pads)`);
+    holes = Object.fromEntries(Object.entries(holes).map(([t, v]) => [t, v.map(p => legApplyTf(tf, p))]));
+    const sizes = {}; let src = '';
+    for (const r of racks) Object.assign(sizes, legParseRack(r.text));
+    if (racks.length) src = racks.map(r => r.name).join(', ');
+    const tools = Object.keys(holes).filter(t => holes[t].length);
+    if (tools.some(t => !(t in sizes)) && prt) {
+      const leg = legPrtLegend(prt.text), need = tools.filter(t => !(t in sizes)).sort((a, b) => a - b);
+      if (leg.length === need.length) { need.forEach((t, i) => sizes[t] = leg[i]); src = (src ? src + ' + ' : '') + prt.name + ' legend'; }
+    }
+    const unknown = tools.filter(t => !(t in sizes));
+    for (const t of unknown) sizes[t] = 0.8;
+    if (unknown.length) warn.push('hole sizes unknown for ' + unknown.map(t => 'T' + t).join(', ') + ' (shown as 0.8 mm) — add the drill rack file');
+    if (src) notes.push('hole sizes from ' + src);
+    for (const t of tools) holesOut.push({ t, d: sizes[t], pts: holes[t], plated: holes[t].filter(p => legNear(p, pads)).length >= holes[t].length / 2 });
+  }
+
+  // Write RS-274X layers
+  const M = 15, inside = p => !box || (p[0] >= box[0] - M && p[0] <= box[2] + M && p[1] >= box[1] - M && p[1] <= box[3] + M);
+  const onEdge = (p, q, tol = 2) => box && ((Math.abs(p[0] - q[0]) <= tol && Math.min(Math.abs(p[0] - box[0]), Math.abs(p[0] - box[2])) <= tol) ||
+                                            (Math.abs(p[1] - q[1]) <= tol && Math.min(Math.abs(p[1] - box[1]), Math.abs(p[1] - box[3])) <= tol));
+  let dropped = 0, marks = 0;
+  for (const a of gbrs) {
+    const kind = legKind(a.name);
+    if (kind === 'doc') { files.push({ name: a.name, ignore: true, hint: 'EAGLE documentation print (outline and labels) — not a fab layer; used to find the board outline.' }); continue; }
+    const body = [], used = new Set(); let cur = null, here = null;
+    for (const o of G.get(a)) {
+      if (!inside(o.a) || !inside(o.b)) { dropped++; continue; }
+      if (o.op === 1 && (kind === 'cu' || kind === 'silk') && onEdge(o.a, o.b)) { marks++; continue; }
+      if (o.d !== cur) { body.push(`D${o.d}*`); cur = o.d; }
+      used.add(o.d);
+      if (o.op === 3) { body.push(`X${o.b[0]}Y${o.b[1]}D03*`); here = o.b; }
+      else {
+        if (!here || here[0] !== o.a[0] || here[1] !== o.a[1]) body.push(`X${o.a[0]}Y${o.a[1]}D02*`);
+        body.push(`X${o.b[0]}Y${o.b[1]}D01*`); here = o.b;
+      }
+    }
+    const hdr = [`G04 ${a.name} converted from EAGLE RS-274D + ${wheelF.name}*`, '%FSLAX23Y23*%', '%MOIN*%', '%LPD*%',
+      ...[...used].sort((x, y) => x - y).map(d => `%ADD${d}${legApDef(ap[d])}*%`)];
+    files.push({ name: a.name, text: [...hdr, 'G01*', ...body, 'M02*'].join('\n') + '\n',
+      legacy: 'converted from RS-274D' + (legSide(a.name) === 'bot' && tfBot.n !== 'x,y' ? ', un-mirrored' : '') });
+  }
+  if (dropped) notes.push(`${dropped} off-board graphics removed`);
+  if (marks) notes.push(`${marks} crop-mark segments on the board edge removed`);
+  if (box) files.push({ name: base + '-outline.GKO', legacy: 'board outline taken from the EAGLE files', text: ['G04 board outline from EAGLE RS-274D set*', '%FSLAX23Y23*%', '%MOIN*%', '%ADD10C,0.00400*%', 'D10*',
+    `X${box[0]}Y${box[1]}D02*`, `X${box[2]}Y${box[1]}D01*`, `X${box[2]}Y${box[3]}D01*`, `X${box[0]}Y${box[3]}D01*`, `X${box[0]}Y${box[1]}D01*`, 'M02*'].join('\n') + '\n' });
+  for (const [plated, sfx] of [[true, 'PTH'], [false, 'NPTH']]) {
+    const hs = holesOut.filter(h => h.plated === plated); if (!hs.length) continue;
+    const L = ['M48', `; ${sfx} drill converted from EAGLE ${drills.map(d => d.name).join(', ')}`, 'METRIC,TZ', ...hs.map((h, i) => `T${String(i + 1).padStart(2, '0')}C${h.d.toFixed(3)}`), '%', 'G90', 'G05'];
+    hs.forEach((h, i) => { L.push(`T${String(i + 1).padStart(2, '0')}`); for (const [x, y] of h.pts) L.push(`X${(x * 0.0254).toFixed(3)}Y${(y * 0.0254).toFixed(3)}`); });
+    files.push({ name: `${base}-${sfx}.DRL`, text: [...L, 'M30'].join('\n') + '\n', legacy: 'converted from EAGLE drill' + (plated ? '' : ' (holes without copper pads)') });
+  }
+  files.push({ name: wheelF.name, ignore: true, hint: 'EAGLE aperture wheel — used to convert the RS-274D Gerbers.' });
+  for (const r of racks) files.push({ name: r.name, ignore: true, hint: /Drill Station Info/i.test(r.text) ? 'EAGLE drill info (.DRI) — used for the hole sizes.' : 'EAGLE drill rack — used for the hole sizes.' });
+  const msg = 'Converted old EAGLE RS-274D files' + (notes.length ? ': ' + notes.join('; ') : '') + (warn.length ? '. Check: ' + warn.join('; ') : '') + '.';
+  return { files, consumed: pending, msg };
+}
+
 let uid = 0;
 async function addFiles(list) {
   try { await addFilesInner(list); } catch (err) { console.error(err); busy.classList.remove('on'); alert('Could not open files: ' + (err.message || err)); }
@@ -2520,14 +2754,24 @@ async function addFilesInner(list) {
       added.push({ name: file.name, text: await file.text() });
     }
   }
+  // Old EAGLE RS-274D sets (.CMP/.SOL/... + .WHL) are converted to RS-274X before detection
+  let legacyMsg = null;
+  const pendingLegacy = state.files.filter(f => f.legacyRaw);
+  const conv = convertLegacyEagle(added, pendingLegacy);
+  if (conv) {
+    state.files = state.files.filter(f => !conv.consumed.includes(f));
+    added.splice(0, added.length, ...conv.files); legacyMsg = conv.msg;
+  }
   for (const a of added) {
     if (a.skip) { state.files.push({ id: ++uid, name: a.name, text: '', type: 'ignore', hint: a.skip }); continue; }
+    if (a.ignore) { state.files.push({ id: ++uid, name: a.name, text: '', type: 'ignore', hint: a.hint, legacyRaw: a.legacyRaw }); continue; }
     // Binary files (e.g. Altium's EIA .DRL) are listed with an explanation instead of silently dropped
     const head = a.text.slice(0, 2000), ctrl = (head.match(/[\u0000-\u0008\u000e-\u001f�]/g) || []).length;
     if (ctrl > Math.max(4, head.length * 0.05)) { state.files.push({ id: ++uid, name: a.name, text: '', type: 'ignore', binary: true }); continue; }
-    state.files.push({ id: ++uid, name: a.name, text: a.text, type: detectType(a.name, a.text) });
+    state.files.push({ id: ++uid, name: a.name, text: a.text, type: detectType(a.name, a.text), legacy: a.legacy });
   }
   rebuild(true);
+  if (legacyMsg) showToast(legacyMsg, 'OK', () => {}, 15000);
 }
 
 document.getElementById('fileInput').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
@@ -2567,8 +2811,8 @@ function saveSessionSoon() {
   clearTimeout(sessionTimer);
   sessionTimer = setTimeout(async () => {
     try {
-      const files = state.files.map(f => ({ name: f.name, text: f.text, type: f.type, binary: !!f.binary, hint: f.hint || null, hidden: !!f.hidden }));
-      const size = files.reduce((n, f) => n + f.text.length, 0);
+      const files = state.files.map(f => ({ name: f.name, text: f.text, type: f.type, binary: !!f.binary, hint: f.hint || null, hidden: !!f.hidden, legacy: f.legacy || null, legacyRaw: f.legacyRaw || null }));
+      const size = files.reduce((n, f) => n + f.text.length + (f.legacyRaw?.length || 0), 0);
       await idb.put('session', size < 150e6 ? { files, saved: Date.now() } : null);   // very large sets are not kept
     } catch (e) { /* storage unavailable (private window, blocked site data) */ }
   }, 400);
@@ -2578,7 +2822,7 @@ async function restoreSession() {
   try { ses = await idb.get('session'); } catch { return; }
   if (!ses?.files?.length || state.files.length) return;
   restoring = true;
-  for (const f of ses.files) state.files.push({ id: ++uid, name: f.name, text: f.text || '', type: f.type, binary: f.binary, hint: f.hint || undefined, hidden: !!f.hidden });
+  for (const f of ses.files) state.files.push({ id: ++uid, name: f.name, text: f.text || '', type: f.type, binary: f.binary, hint: f.hint || undefined, hidden: !!f.hidden, legacy: f.legacy || undefined, legacyRaw: f.legacyRaw || undefined });
   rebuild(true, () => {
     restoring = false;
     showToast(`Reopened your last board (${ses.files.length} file${ses.files.length > 1 ? 's' : ''})`, 'Clear', () => removeFiles(state.files.slice()), 10000);
