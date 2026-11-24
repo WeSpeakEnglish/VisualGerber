@@ -1233,8 +1233,22 @@ function animate(t) {
     const s = tmpV.z >= 0 ? 1 : -1;
     for (const o of g.children) if (!o.userData.helper) o.renderOrder = s * (o.position.z + (o.userData.zoff || 0));
     placeMeasureLabel(g);
+    fitClipPlanes(g);
   }
   renderer.render(scene, cam);
+}
+// Depth precision falls with the square of the viewing distance, so fixed near/far planes (0.1 to 5000 mm)
+// let barrels and hole walls only 0.01 mm apart z-fight on larger boards. Keep the planes tight around the board.
+const clipBox = new THREE.Box3(), clipSphere = new THREE.Sphere();
+function fitClipPlanes(g) {
+  if (cam !== persp) return;
+  const key = state.explode + '|' + g.children.length;
+  if (g.userData.clipKey !== key) { clipBox.setFromObject(g); clipBox.getBoundingSphere(clipSphere); g.userData.clipSphere = clipSphere.clone(); g.userData.clipKey = key; }
+  const sp = g.userData.clipSphere, d = cam.position.distanceTo(sp.center), R = sp.radius * 1.05 + 1;
+  const near = Math.max(d - R, d * 0.002, 0.01), far = d + R;
+  if (Math.abs(near - persp.near) > persp.near * 0.02 || Math.abs(far - persp.far) > persp.far * 0.02) {
+    persp.near = near; persp.far = far; persp.updateProjectionMatrix();
+  }
 }
 requestAnimationFrame(animate);
 
@@ -1788,7 +1802,9 @@ function buildGeometry() {
     if (halves.length) {   // castellated holes: plated half barrels along the notch
       const pos = [], nrm = [], z = t * 0.499;
       for (const h of halves) for (let k = 0; k + 1 < h.arc.length; k++) {
-        const [x1, y1] = h.arc[k], [x2, y2] = h.arc[k + 1], X1 = x1 - cx, Y1 = y1 - cy, X2 = x2 - cx, Y2 = y2 - cy;
+        // pulled 0.01 mm towards the hole centre so the plating sits in front of the notch wall instead of z-fighting with it
+        const sh = ([x, y]) => { const r0 = h.d / 2, k2 = (r0 - Math.min(0.01, r0 * 0.08)) / r0; return [h.x + (x - h.x) * k2, h.y + (y - h.y) * k2]; };
+        const [x1, y1] = sh(h.arc[k]), [x2, y2] = sh(h.arc[k + 1]), X1 = x1 - cx, Y1 = y1 - cy, X2 = x2 - cx, Y2 = y2 - cy;
         const n = (x, y) => { const dx = h.x - x, dy = h.y - y, l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l, 0]; };
         const n1 = n(x1, y1), n2 = n(x2, y2);
         pos.push(X1, Y1, -z, X2, Y2, -z, X2, Y2, z, X1, Y1, -z, X2, Y2, z, X1, Y1, z);
@@ -1801,7 +1817,9 @@ function buildGeometry() {
       const cyl = new THREE.CylinderGeometry(1, 1, 1, 28, 1, true); cyl.rotateX(Math.PI / 2); D.push(cyl);
       const mat = getBarrelMat();
       const im = new THREE.InstancedMesh(cyl, mat, plated.length), m4 = new THREE.Matrix4();
-      plated.forEach((h, i) => { const r = h.d / 2 - 0.004; m4.makeScale(r, r, t * 0.998); m4.setPosition(h.x - cx, h.y - cy, 0); im.setMatrixAt(i, m4); });
+      // The hole is cut as a polygon whose flat sides lie inside the true circle; the barrel must sit inside
+      // those flats, or it z-fights with the hole wall (vertical stripes). The gap shrinks for tiny holes so it never goes negative.
+      plated.forEach((h, i) => { const r0 = h.d / 2, n = Math.max(16, Math.min(64, Math.round(r0 * 40))), r = r0 * Math.cos(Math.PI / n) - Math.min(0.01, r0 * 0.08); m4.makeScale(r, r, t * 0.998); m4.setPosition(h.x - cx, h.y - cy, 0); im.setMatrixAt(i, m4); });
       g.add(im);
     }
   } else {
