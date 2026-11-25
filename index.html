@@ -287,6 +287,7 @@ kbd{display:inline-block;min-width:18px;text-align:center;padding:1px 5px;border
         <button id="pngBtn2" class="small" title="Save the current view as an image">PNG image</button>
         <button id="glbBtn" class="small" title="3D model with colors and textures">GLB model</button>
         <button id="stlBtn" class="small" title="Geometry only, in mm">STL mesh</button>
+        <button id="stepBtn" class="small" title="Solid model for CAD (AP214, mm): board with true round holes, cutouts and slots, plus parts as named boxes">STEP model</button>
       </div>
 
       <div class="sec sec-row"><span>Board</span>
@@ -4146,6 +4147,197 @@ document.getElementById('stlBtn').onclick = () => {
   root.updateMatrixWorld(true);
   const data = new STLExporter().parse(root, { binary: true });
   download(new Blob([data], { type: 'model/stl' }), 'pcb.stl'); disposeRoot(root);
+};
+
+/* =====================================================================
+   STEP export (ISO 10303-21, AP214 automotive_design)
+   The board is written as a real B-rep solid, not a mesh: the outline, cutouts and slots become
+   flat faces and every round hole a true cylinder, so CAD tools can measure, mate and fillet
+   against it. Pick-and-place parts become named boxes. The file is an assembly (board + one
+   part per component) with colours. Gerber coordinates in mm, board bottom at Z = 0.
+   ===================================================================== */
+function stepNum(v) {
+  if (!Number.isFinite(v)) v = 0;
+  let s = String(Math.round(v * 1e6) / 1e6);
+  if (s === '-0') s = '0';
+  return /[.eE]/.test(s) ? s : s + '.';
+}
+function stepStr(s) {   // STEP string: quotes doubled, backslash doubled, non-ASCII as \X2\hhhh\X0\
+  let o = '';
+  for (const ch of String(s ?? '')) {
+    const c = ch.codePointAt(0);
+    if (ch === "'") o += "''"; else if (ch === '\\') o += '\\\\';
+    else if (c < 32 || c > 126) { for (let i = 0; i < ch.length; i++) o += '\\X2\\' + ch.charCodeAt(i).toString(16).toUpperCase().padStart(4, '0') + '\\X0\\'; }
+    else o += ch;
+  }
+  return "'" + o + "'";
+}
+// Drop repeated and in-line points (they would make zero-area faces), then orient the loop
+function stepCleanLoop(pts, ccw) {
+  const p = [];
+  for (const q of pts) if (!p.length || Math.hypot(q[0] - p[p.length - 1][0], q[1] - p[p.length - 1][1]) > 1e-5) p.push([q[0], q[1]]);
+  while (p.length > 2 && Math.hypot(p[0][0] - p[p.length - 1][0], p[0][1] - p[p.length - 1][1]) <= 1e-5) p.pop();
+  for (let changed = true; changed && p.length > 3;) {
+    changed = false;
+    for (let i = 0; i < p.length && p.length > 3; i++) {
+      const a = p[(i - 1 + p.length) % p.length], b = p[i], c = p[(i + 1) % p.length];
+      const ux = b[0] - a[0], uy = b[1] - a[1], vx = c[0] - b[0], vy = c[1] - b[1];
+      if (Math.abs(ux * vy - uy * vx) <= 1e-7 * Math.hypot(ux, uy) * Math.hypot(vx, vy)) { p.splice(i, 1); i--; changed = true; }
+    }
+  }
+  if (p.length < 3) return null;
+  if ((polyArea(p) > 0) !== ccw) p.reverse();
+  return p;
+}
+// board: { outer: [[x,y]...], inner: [[[x,y]...]...] (cutouts, slots), circles: [{x,y,r}], z0, z1, color }
+// parts: [{ name, x, y, rot, l, w, z0, z1, color }]
+function buildStepFile({ name, board, parts = [] }) {
+  const out = []; let id = 0;
+  const E = s => { out.push(`#${++id}=${s};`); return '#' + id; };
+  const N = stepNum, S = stepStr;
+  const dirs = new Map();
+  const dir = (x, y, z) => { const k = [x, y, z].map(N).join(','); if (!dirs.has(k)) dirs.set(k, E(`DIRECTION('',(${k}))`)); return dirs.get(k); };
+  const pt = (x, y, z) => E(`CARTESIAN_POINT('',(${N(x)},${N(y)},${N(z)}))`);
+  const ax = (p, z, x) => E(`AXIS2_PLACEMENT_3D('',${p},${z},${x})`);
+
+  const app = E(`APPLICATION_CONTEXT('core data for automotive mechanical design processes')`);
+  E(`APPLICATION_PROTOCOL_DEFINITION('international standard','automotive_design',2000,${app})`);
+  const prodCtx = E(`PRODUCT_CONTEXT('',${app},'mechanical')`), pdCtx = E(`PRODUCT_DEFINITION_CONTEXT('part definition',${app},'design')`);
+  const lenU = E(`(LENGTH_UNIT()NAMED_UNIT(*)SI_UNIT(.MILLI.,.METRE.))`);
+  const angU = E(`(NAMED_UNIT(*)PLANE_ANGLE_UNIT()SI_UNIT($,.RADIAN.))`);
+  const solU = E(`(NAMED_UNIT(*)SI_UNIT($,.STERADIAN.)SOLID_ANGLE_UNIT())`);
+  const unc = E(`UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-06),${lenU},'distance_accuracy_value','confusion accuracy')`);
+  const ctx = E(`(GEOMETRIC_REPRESENTATION_CONTEXT(3)GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((${unc}))GLOBAL_UNIT_ASSIGNED_CONTEXT((${lenU},${angU},${solU}))REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY'))`);
+  const origin = ax(pt(0, 0, 0), dir(0, 0, 1), dir(1, 0, 0));
+
+  // ---- B-rep: a flat profile (outer loop, inner loops, round holes) extruded from z0 to z1
+  const V = p => E(`VERTEX_POINT('',${p})`);
+  const line = (p, x0, y0, z0, x1, y1, z1) => { const L = Math.hypot(x1 - x0, y1 - y0, z1 - z0); return E(`LINE('',${p},${E(`VECTOR('',${dir((x1 - x0) / L, (y1 - y0) / L, (z1 - z0) / L)},${N(L)})`)})`); };
+  const edge = (a, b, c) => E(`EDGE_CURVE('',${a},${b},${c},.T.)`);
+  const oe = (e, fwd) => E(`ORIENTED_EDGE('',*,*,${e},${fwd ? '.T.' : '.F.'})`);
+  const loop = (oes, outer) => E(`${outer ? 'FACE_OUTER_BOUND' : 'FACE_BOUND'}('',${E(`EDGE_LOOP('',(${oes.join(',')}))`)},.T.)`);
+  const face = (bounds, surf, sense = true) => E(`ADVANCED_FACE('',(${bounds.join(',')}),${surf},${sense ? '.T.' : '.F.'})`);
+  // Loops run with the material on their left (outer counter-clockwise, holes clockwise, seen from +Z);
+  // every face's edge loop then runs counter-clockwise seen from outside the solid.
+  function solid(label, outerPts, innerLoops, circles, z0, z1) {
+    const faces = [], top = [], bot = [];
+    [outerPts, ...innerLoops].forEach((pts, li) => {
+      const n = pts.length;
+      const Tp = pts.map(p => pt(p[0], p[1], z1)), Bp = pts.map(p => pt(p[0], p[1], z0)), Tv = Tp.map(V), Bv = Bp.map(V);
+      const Et = [], Eb = [], Ev = [];
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n, [x0, y0] = pts[i], [x1, y1] = pts[j];
+        Et[i] = edge(Tv[i], Tv[j], line(Tp[i], x0, y0, z1, x1, y1, z1));
+        Eb[i] = edge(Bv[i], Bv[j], line(Bp[i], x0, y0, z0, x1, y1, z0));
+        Ev[i] = edge(Bv[i], Tv[i], line(Bp[i], x0, y0, z0, x0, y0, z1));
+      }
+      top.push(loop(Et.map(e => oe(e, true)), li === 0));
+      bot.push(loop(Eb.slice().reverse().map(e => oe(e, false)), li === 0));
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n, dx = pts[j][0] - pts[i][0], dy = pts[j][1] - pts[i][1], L = Math.hypot(dx, dy);
+        const pl = E(`PLANE('',${ax(Bp[i], dir(dy / L, -dx / L, 0), dir(dx / L, dy / L, 0))})`);   // outward normal = right of travel
+        faces.push(face([loop([oe(Eb[i], true), oe(Ev[j], true), oe(Et[i], false), oe(Ev[i], false)], true)], pl));
+      }
+    });
+    for (const c of circles) {   // two half cylinders, so no seam edge is needed
+      const T0 = pt(c.x + c.r, c.y, z1), T1 = pt(c.x - c.r, c.y, z1), B0 = pt(c.x + c.r, c.y, z0), B1 = pt(c.x - c.r, c.y, z0);
+      const t0 = V(T0), t1 = V(T1), b0 = V(B0), b1 = V(B1);
+      const cT = E(`CIRCLE('',${ax(pt(c.x, c.y, z1), dir(0, 0, 1), dir(1, 0, 0))},${N(c.r)})`);
+      const cB = E(`CIRCLE('',${ax(pt(c.x, c.y, z0), dir(0, 0, 1), dir(1, 0, 0))},${N(c.r)})`);
+      const At = edge(t0, t1, cT), Bt = edge(t1, t0, cT), Ab = edge(b0, b1, cB), Bb = edge(b1, b0, cB);   // A = upper half, B = lower (counter-clockwise)
+      const S0 = edge(b0, t0, line(B0, c.x + c.r, c.y, z0, c.x + c.r, c.y, z1)), S1 = edge(b1, t1, line(B1, c.x - c.r, c.y, z0, c.x - c.r, c.y, z1));
+      top.push(loop([oe(Bt, false), oe(At, false)], false));
+      bot.push(loop([oe(Ab, true), oe(Bb, true)], false));
+      const cyl = E(`CYLINDRICAL_SURFACE('',${ax(pt(c.x, c.y, z0), dir(0, 0, 1), dir(1, 0, 0))},${N(c.r)})`);
+      faces.push(face([loop([oe(Ab, false), oe(S0, true), oe(At, true), oe(S1, false)], true)], cyl, false));   // wall faces the hole
+      faces.push(face([loop([oe(Bb, false), oe(S1, true), oe(Bt, true), oe(S0, false)], true)], cyl, false));
+    }
+    faces.push(face(top, E(`PLANE('',${ax(pt(0, 0, z1), dir(0, 0, 1), dir(1, 0, 0))})`)));
+    faces.push(face(bot, E(`PLANE('',${ax(pt(0, 0, z0), dir(0, 0, -1), dir(1, 0, 0))})`)));
+    return E(`MANIFOLD_SOLID_BREP(${S(label)},${E(`CLOSED_SHELL('',(${faces.join(',')}))`)})`);
+  }
+
+  // ---- colours
+  const styled = [], styles = new Map();
+  const colour = (hex, item) => {
+    if (!styles.has(hex)) {
+      const v = parseInt(String(hex).slice(1), 16), c = E(`COLOUR_RGB('',${N((v >> 16 & 255) / 255)},${N((v >> 8 & 255) / 255)},${N((v & 255) / 255)})`);
+      const fill = E(`FILL_AREA_STYLE('',(${E(`FILL_AREA_STYLE_COLOUR('',${c})`)}))`);
+      const side = E(`SURFACE_SIDE_STYLE('',(${E(`SURFACE_STYLE_FILL_AREA(${fill})`)}))`);
+      styles.set(hex, E(`PRESENTATION_STYLE_ASSIGNMENT((${E(`SURFACE_STYLE_USAGE(.BOTH.,${side})`)}))`));
+    }
+    styled.push(E(`STYLED_ITEM('color',(${styles.get(hex)}),${item})`));
+  };
+
+  // ---- assembly: the job is the root, the board and each component are parts under it
+  const product = nm => {
+    const p = E(`PRODUCT(${S(nm)},${S(nm)},'',(${prodCtx}))`);
+    E(`PRODUCT_RELATED_PRODUCT_CATEGORY('part',$,(${p}))`);
+    const pd = E(`PRODUCT_DEFINITION('design','',${E(`PRODUCT_DEFINITION_FORMATION('','',${p})`)},${pdCtx})`);
+    return { pd, pds: E(`PRODUCT_DEFINITION_SHAPE('','',${pd})`) };
+  };
+  const root = product(name), rootSR = E(`SHAPE_REPRESENTATION(${S(name)},(${origin}),${ctx})`);
+  E(`SHAPE_DEFINITION_REPRESENTATION(${root.pds},${rootSR})`);
+  let occ = 0;
+  const addPart = (nm, brep, color) => {
+    const pr = product(nm), sr = E(`ADVANCED_BREP_SHAPE_REPRESENTATION(${S(nm)},(${origin},${brep}),${ctx})`);
+    E(`SHAPE_DEFINITION_REPRESENTATION(${pr.pds},${sr})`);
+    colour(color, brep);
+    const nauo = E(`NEXT_ASSEMBLY_USAGE_OCCURRENCE(${S('NAUO' + ++occ)},${S(nm)},'',${root.pd},${pr.pd},$)`);
+    const idt = E(`ITEM_DEFINED_TRANSFORMATION('','',${origin},${origin})`);
+    const rel = E(`(REPRESENTATION_RELATIONSHIP('','',${sr},${rootSR})REPRESENTATION_RELATIONSHIP_WITH_TRANSFORMATION(${idt})SHAPE_REPRESENTATION_RELATIONSHIP())`);
+    E(`CONTEXT_DEPENDENT_SHAPE_REPRESENTATION(${rel},${E(`PRODUCT_DEFINITION_SHAPE('Placement','',${nauo})`)})`);
+  };
+
+  const b = board, outer = stepCleanLoop(b.outer, true);
+  if (!outer) throw new Error('board outline is empty');
+  const inner = b.inner.map(l => stepCleanLoop(l, false)).filter(Boolean);
+  addPart('PCB', solid('PCB', outer, inner, b.circles, b.z0, b.z1), b.color);
+  for (const p of parts) {
+    const cs = Math.cos(p.rot * Math.PI / 180), sn = Math.sin(p.rot * Math.PI / 180);
+    const rect = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => [p.x + u * p.l / 2 * cs - v * p.w / 2 * sn, p.y + u * p.l / 2 * sn + v * p.w / 2 * cs]);
+    addPart(p.name, solid(p.name, stepCleanLoop(rect, true), [], [], p.z0, p.z1), p.color);
+  }
+  if (styled.length) E(`MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION('',(${styled.join(',')}),${ctx})`);
+
+  const now = new Date().toISOString().slice(0, 19);
+  return ['ISO-10303-21;', 'HEADER;', `FILE_DESCRIPTION(('Printed circuit board'),'2;1');`,
+    `FILE_NAME(${S(name + '.step')},'${now}',(''),(''),'Gerber 3D Viewer','Gerber 3D Viewer','');`,
+    `FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));`, 'ENDSEC;', 'DATA;', ...out, 'ENDSEC;', 'END-ISO-10303-21;', ''].join('\n');
+}
+// end STEP writer
+
+document.getElementById('stepBtn').onclick = () => {
+  if (!built) return;
+  busy.textContent = 'Exporting…'; busy.classList.add('on');
+  setTimeout(() => {
+    try {
+      const t = state.thick, circles = [], slots = [];
+      for (const h of built.cut) {
+        if (h.x2 == null || Math.hypot(h.x2 - h.x, h.y2 - h.y) < 1e-6) circles.push({ x: h.x, y: h.y, r: h.d / 2 });
+        else slots.push(holePolygon(h, 0, 0).map(v => [v.x, v.y]));
+      }
+      const parts = L('pnp').on ? built.comps.map(c => {
+        const [l, w, hz] = c.size, ht = Math.max(hz, 0.05);
+        return { name: (c.ref || 'part') + (c.val ? ' ' + c.val : ''), x: c.x, y: c.y, rot: c.rot || 0, l: Math.max(l, 0.05), w: Math.max(w, 0.05),
+          z0: c.bottom ? -ht : t, z1: c.bottom ? 0 : t + ht, color: compColor(c) };
+      }) : [];
+      let base = state.setName || '';
+      if (!base || /^\d+ files$/.test(base)) {   // loose files: use the name they share, e.g. "board" from board-F_Cu.gbr, board.drl
+        const ns = state.files.map(f => f.name); base = ns[0] || '';
+        for (const n of ns) while (base && !n.startsWith(base)) base = base.slice(0, -1);
+        base = base.replace(/[-_. ]+$/, '');
+      }
+      const name = (base || 'pcb').replace(/\.(zip|tgz|tar\.gz|tar|gz)$/i, '').replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '') || 'pcb';
+      const mask = RCOL('top-mask');
+      const txt = buildStepFile({ name, parts, board: { outer: built.outer, inner: [...built.cutouts, ...slots], circles, z0: 0, z1: t, color: /^#[0-9a-f]{6}$/i.test(mask) ? mask : '#1d5a2c' } });
+      download(new Blob([txt], { type: 'model/step' }), name + '.step');
+      const skipped = built.painted.length;
+      showToast(`Saved ${name}.step — ${circles.length + slots.length} holes${parts.length ? `, ${parts.length} parts` : ''}`
+        + (skipped ? ` · ${skipped} hole${skipped > 1 ? 's' : ''} touching an edge or another hole not cut` : ''), 'OK', () => {}, 8000);
+    } catch (e) { console.error(e); alert('STEP export failed: ' + (e.message || e)); }
+    finally { busy.classList.remove('on'); busy.textContent = 'Rendering…'; }
+  }, 20);
 };
 
 // Theme
