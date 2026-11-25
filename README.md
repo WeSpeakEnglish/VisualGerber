@@ -1,7 +1,8 @@
 # Gerber 3D Viewer
 
 A single-file, browser-based 2D and 3D viewer for PCB Gerber, Excellon drill, pick-and-place and ODB++ files,
-including old EAGLE RS-274D sets with a `.WHL` aperture file. It can also compare two versions of a board and show what changed.
+including old EAGLE RS-274D sets with a `.WHL` aperture file. It can also compare two versions of a board and show what changed,
+and export the board as a STEP solid for mechanical CAD.
 Open `index.html` in a browser, drop in your fabrication files (loose or zipped),
 and inspect the board as flat layers or as a 3D model with solder mask, surface finish, silkscreen, inner layers, drilled holes and components.
 
@@ -90,6 +91,12 @@ Click **Compare…** with a board loaded and pick another version of it: Gerbers
 - **PNG** image of the current view.
 - **GLB** 3D model with colors and textures, in real-world scale.
 - **STL** mesh of the board, plated holes and components, in mm.
+- **STEP** solid model for mechanical CAD (AP214, in mm), opened as real solids rather than a mesh:
+  - The **board** is one solid built from the outline, with cutouts, slots and castellated notches as flat faces and every round hole as a true cylinder, so you can measure diameters and mate against hole walls.
+  - **Components** from the pick-and-place data are named boxes (for example *R1 10k*), each a separate part in an assembly with the board. Top parts sit on the top surface; bottom parts hang below.
+  - **Colors**: the board takes the solder mask color, components the same colors as in 3D.
+  - **Coordinates** are the Gerber coordinates, with the board bottom at Z = 0 and the top at the board thickness.
+  - The file is named after the zip or ODB++ job, or after the name the loose files share (e.g. `board.step`). A notice after saving gives the hole and part counts.
 
 ### Remembered settings
 
@@ -227,6 +234,7 @@ Toolbar: **2D | 3D**, **Style** (Layers / Realistic), **Iso**, **Top**, **Bottom
 - **Binary drill files**: Altium's binary EIA `.DRL` cannot be read; use the ASCII NC drill file (`.TXT`) from the same export.
 - **Texture resolution**: this is limited by your GPU (usually 4096 px across the longest board side). Very large boards show less fine detail. While you drag a slider or color on a large board, a quicker lower-resolution preview is shown and the sharp version follows when you stop.
 - **Components are approximate**: parts are simple boxes sized from the package name, not real 3D models. Pin headers and connectors are drawn as their low plastic body.
+- **STEP export** is a mechanical model: the board body and component boxes only, without copper, solder mask or silkscreen. Holes that are drawn flat instead of cut (see *Holes that cannot be cut*) are left out of the solid, and the notice after saving says how many. Plated half-holes are cut as notches but carry no plating. Arcs in the outline are written as short straight segments.
 - **Nested zips**: a zip inside a zip is not opened (it is listed with a note). Extract it first. A `.tgz` inside a zip is opened.
 - **ODB++**: blind and buried drill spans are drawn as through-holes, barcodes are skipped, and thermals with other than four spokes are drawn as plain rings. Components are boxes from the package outline, not 3D models.
 - **Compare**: each layer is compared on a grid of up to 40 pixels per mm (25 µm), less on very large boards, so differences smaller than that are not seen. Only a pure offset between the two exports is corrected, not rotation or mirroring. Very different copper pours (e.g. a board re-poured in another tool) produce many small changes.
