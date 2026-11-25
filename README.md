@@ -1,7 +1,7 @@
 # Gerber 3D Viewer
 
 A single-file, browser-based 2D and 3D viewer for PCB Gerber, Excellon drill, pick-and-place and ODB++ files,
-including old EAGLE RS-274D sets with a `.WHL` aperture file. It can also compare two versions of a board and show what changed,
+including old EAGLE RS-274D sets with a `.WHL` aperture file and PADS-style sets whose files have no extension. It can also compare two versions of a board and show what changed,
 and export the board as a STEP solid for mechanical CAD.
 Open `index.html` in a browser, drop in your fabrication files (loose or zipped),
 and inspect the board as flat layers or as a 3D model with solder mask, surface finish, silkscreen, inner layers, drilled holes and components.
@@ -37,6 +37,7 @@ No installation, no build step and no server. Files are processed locally in you
 ### Board and layers
 
 - **Real board shape** from the outline layer, including internal cutouts, slots and notches. Plated and non-plated holes are cut through the board, and plated holes get metal barrels.
+- **Panels**: when the outline layer holds several copies of the same board (a panel with rails and route channels), the viewer shows the whole panel as one sheet with every route and break line drawn on it, instead of cutting the boards out of the frame. The Board panel shows the number of boards, the grid (for example *10 boards (5 × 2)*) and the size of one board. Only shapes inside a board are cut out.
 - **Castellated (half) holes**: a hole whose centre sits on a straight board edge is cut as a half-circle notch with a plated half-barrel. The Board panel counts them, and the fab check reminds you to order the castellated-hole option.
 - **All common layers drawn**: top and bottom copper, solder mask, silkscreen and paste, any number of inner copper layers, outline and drills.
 - **One card per file**: each file card has a show/hide checkbox, an opacity slider, a color dot and the layer-type dropdown, listed in physical order (top silkscreen down to bottom silkscreen, then outline, drills and pick-and-place). Hiding one file hides only that file, so for example the PTH and NPTH drill files can be switched separately. Click a dot to change that layer's color; Layers and Realistic styles keep separate palettes, and **Reset colors** under the list restores the defaults of the current style.
@@ -115,6 +116,7 @@ Colors, opacities, style, 2D/3D choice, units, fab-check manufacturer, thickness
 - Block apertures (`AB`), including nested blocks and blocks flashed with clear polarity
 - Aperture transformations: mirroring (`LM`), rotation (`LR`) and scaling (`LS`), applied to flashes, draws and block apertures
 - X2 file attributes (`%TF.FileFunction`) for automatic layer detection, including inner layer order
+- Layer names (`%LN…*%`) as a hint for layer detection when the file name says nothing
 - X2 object attributes (`%TO.N` net, `%TO.P` pad, `%TO.C` component, `%TD`) for net and pin information
 
 ### Legacy EAGLE RS-274D (with `.WHL` aperture wheel)
@@ -167,7 +169,7 @@ A notice after loading summarises the job: source tool, step, layer, hole and co
 - Tool definitions in the header or body
 - Slots via `G85` and routed paths (`G00` / `M15` / `G01` / `M16`)
 - Plated vs. non-plated detection from the file name (`NPTH`) or `TYPE=NON_PLATED` comments
-- Drill data exported in Gerber format is also accepted. Drill *drawings* (symbol charts such as `.GDD`, `.GG1` or files named *DrillDrawing*) are recognised and not mistaken for drill data.
+- Drill data exported in Gerber format is also accepted. Such files rarely say whether they are plated, so unless the `FileFunction` attribute or the file name (`NPTH`, `PTH`) says so, plating is worked out from the copper: a file whose holes sit in copper clearances (clear flashes) or on no pad is non-plated, one whose holes sit on pads is plated. Drill *drawings* (symbol charts such as `.GDD`, `.GG1` or files named *DrillDrawing*) are recognised and not mistaken for drill data.
 
 ### Pick and place (centroid)
 
@@ -195,6 +197,18 @@ Each file's layer is detected automatically, in this order:
 | Inner copper | `In1_Cu`… | `.G1`, `.G2`… | `.ly2`, `.ly3`… |
 | Drill | `.drl` | `.TXT` (ASCII) | `.drd`, `.xln` |
 | Pick and place | `-pos.csv`, `.pos` | `Pick Place….txt` / `.csv` | `.mnt`, `.mnb` |
+
+**Files without an extension**: PADS, Mentor and similar tools often write files named just `gtl`, `gbl`, `gts`, `gbs`, `gto`, `gbo`, `gtp`, `gbp`, `rout`, `drl`, `drl2` and so on. These bare names are recognised too, and so is the same name in the file's `%LN…*%` layer-name statement:
+
+| Bare name or `%LN` name | Used as |
+|---|---|
+| `gtl`, `cmp`, `top` / `gbl`, `sol`, `bot` | Top / bottom copper |
+| `gts`, `stc` / `gbs`, `sts` | Top / bottom solder mask |
+| `gto`, `plc` / `gbo`, `pls` | Top / bottom silkscreen |
+| `gtp`, `crc` / `gbp`, `crs` | Top / bottom paste |
+| `g2`, `gp3`, `in1`… | Inner copper |
+| `rout`, `route`, `outline`, `gko`, `gm1`, `mill` | Outline |
+| `drl`, `drl2`, `drill`, `pth`, `npth` | Drill (Gerber format) |
 
 **Board outline**: when several outline-type files are present (for example Altium `.GKO` plus a `.GM1` that holds the drawing frame), the outline is the smallest closed shape that encloses the pads and holes. Larger shapes such as drawing frames and title blocks are ignored, and the Board panel shows which file the outline came from.
 
@@ -228,6 +242,8 @@ Toolbar: **2D | 3D**, **Style** (Layers / Realistic), **Iso**, **Top**, **Bottom
 
 ## Limitations
 
+- **Panels**: the gaps between the boards of a panel are drawn as solid sheet with the route lines on it, because Gerber files do not say which areas are milled away. The STEP export writes the panel as one solid.
+- **Gerber-format drill plating**: when the file does not say whether it is plated, plating is guessed from the copper for the whole file. A file that mixes plated and non-plated holes, or plated vias that sit in a copper pour rather than on flashed pads, may be classed wrongly; change it with the file name or check the fab-check hole counts.
 - **Missing outline**: without an outline layer, the board is framed around the pads and holes (or, with no pads, the bounding box of all layers) plus a 1 mm margin.
 - **Holes that cannot be cut**: holes that overlap each other, holes at a board corner or on a curved edge, and any beyond 4000, are drawn flat on the surface instead of cut through.
 - **Duplicate holes**: a hole listed in two drill files (EasyEDA puts vias in both the PTH and the via file) is drawn once.
