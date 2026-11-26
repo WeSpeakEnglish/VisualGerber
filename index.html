@@ -271,6 +271,8 @@ kbd{display:inline-block;min-width:18px;text-align:center;padding:1px 5px;border
           <input id="thickCustom" type="number" min="0.1" max="10" step="0.01" value="1.6" aria-label="Custom thickness in mm" hidden>
           <select id="thick"><option value="0.4">0.4 mm</option><option value="0.6">0.6 mm</option><option value="0.8">0.8 mm</option><option value="1.0">1.0 mm</option><option value="1.2">1.2 mm</option><option value="1.6" selected>1.6 mm</option><option value="2.0">2.0 mm</option><option value="2.4">2.4 mm</option><option value="3.2">3.2 mm</option><option value="custom">Custom…</option></select>
         </div></div>
+      <div class="row"><label for="cuOz" title="Finished outer copper weight; sets how strongly the copper edges stand out and is noted in the fab check">Copper</label>
+        <select id="cuOz"><option value="0.5">0.5 oz (18 µm)</option><option value="1">1 oz (35 µm)</option><option value="2">2 oz (70 µm)</option><option value="3">3 oz (105 µm)</option></select></div>
       <div class="row"><label for="minView" title="How far you can zoom in: the smallest piece of board that can fill the height of the view">Closest zoom</label>
         <select id="minView"><option value="1">1 mm view</option><option value="2">2 mm view</option><option value="4">4 mm view</option><option value="8">8 mm view</option><option value="16">16 mm view</option></select></div>
       <div class="field" role="group" aria-labelledby="bgLbl">
@@ -1283,7 +1285,7 @@ const state = {
   layers: {}, boardOpacity: 1, style3D: 'real', style2D: 'layers', colors: {}, rcolors: {}, explode: 0, section: { axis: 'off', pos: 0.5 },
   board: null, flipped: false, is2D: true, theme: 'auto', bg: 'theme',
   meas: { on: false, pts: [], hover: null },
-  units: 'mm', fab: 'jlc', net: null, minView: 4,
+  units: 'mm', fab: 'jlc', net: null, minView: 4, cuOz: 1,
 };
 const L = k => state.layers[k] || (state.layers[k] = DEF_LAYER(k));
 const MASKS = [['#1d5a2c', 'Green'], ['#8f1f1f', 'Red'], ['#1d3f8f', 'Blue'], ['#151515', 'Black'], ['#efefef', 'White'], ['#4b2a73', 'Purple'], ['#d7b81c', 'Yellow']];
@@ -1311,7 +1313,7 @@ const STORE = 'gerber3d.settings.v2';
 function loadSettings() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE) || 'null'); if (!s) return;
-    for (const k of ['mask', 'finish', 'silk', 'thick', 'boardOpacity', 'style3D', 'style2D', 'theme', 'bg', 'is2D', 'units', 'fab', 'minView']) if (s[k] != null) state[k] = s[k];
+    for (const k of ['mask', 'finish', 'silk', 'thick', 'boardOpacity', 'style3D', 'style2D', 'theme', 'bg', 'is2D', 'units', 'fab', 'minView', 'cuOz']) if (s[k] != null) state[k] = s[k];
     if (s.style && !s.style3D) state.style3D = s.style;
     if (s.colors && typeof s.colors === 'object') state.colors = s.colors;
     if (s.rcolors && typeof s.rcolors === 'object') state.rcolors = s.rcolors;
@@ -1321,7 +1323,7 @@ function loadSettings() {
 function saveSettings() {
   try {
     localStorage.setItem(STORE, JSON.stringify({ mask: state.mask, finish: state.finish, silk: state.silk, thick: state.thick,
-      boardOpacity: state.boardOpacity, style3D: state.style3D, style2D: state.style2D, colors: state.colors, rcolors: state.rcolors, is2D: state.is2D, units: state.units, fab: state.fab, minView: state.minView, theme: state.theme, bg: state.bg, layers: state.layers }));
+      boardOpacity: state.boardOpacity, style3D: state.style3D, style2D: state.style2D, colors: state.colors, rcolors: state.rcolors, is2D: state.is2D, units: state.units, fab: state.fab, minView: state.minView, cuOz: state.cuOz, theme: state.theme, bg: state.bg, layers: state.layers }));
   } catch { /* storage unavailable */ }
 }
 loadSettings();
@@ -1447,6 +1449,9 @@ function setView(kind, instant) {
   const b = state.board; const bw = b ? b.w : 40, bh = b ? b.h : 40, size = Math.max(bw, bh);
   const aspect = (viewEl.clientWidth || 1) / (viewEl.clientHeight || 1);
   let dir, up = new THREE.Vector3(0, 1, 0);
+  // Top and Bottom always mean the board's own sides: after Flip the board lies upside down, so its top is seen
+  // from below. (Flip turns the board about the view's vertical axis, so either side still reads unmirrored.)
+  if (state.flipped && (kind === 'top' || kind === 'bottom')) kind = kind === 'top' ? 'bottom' : 'top';
   if (kind === 'top') { dir = new THREE.Vector3(0, 1, 0); up = new THREE.Vector3(0, 0, -1); }
   else if (kind === 'bottom') { dir = new THREE.Vector3(0, -1, 0); up = new THREE.Vector3(0, 0, -1); }
   else dir = new THREE.Vector3(-0.35, 1.1, 0.95).normalize();
@@ -1937,6 +1942,12 @@ function fadeDetail(g) {
   U.pcbPOn.value = Math.min(1, Math.max(0, 2 - dt.d / need));
 }
 
+// Copper weight → strength of the copper relief (1 oz: 1.6, the long-standing look; grows with the square root so
+// heavy copper stands out clearly without turning cartoonish)
+const cuOz = () => Math.min(6, Math.max(0.25, +state.cuOz || 1));
+const cuBump = () => 1.6 * Math.sqrt(cuOz());
+const cuLabel = () => `${cuOz()} oz (${Math.round(cuOz() * 35)} µm)`;
+
 // Realistic surface: colour texture plus a packed PBR texture (R = bump, G = roughness, B = metalness)
 function composeSide(side) {
   const [Wp, Hp] = scaledSize();
@@ -1990,7 +2001,7 @@ function composeSide(side) {
   // Physical material: specularIntensity only weakens the reflection of non-metals (mask, silk, laminate),
   // so the mask keeps its real depth of colour instead of mirroring the bright studio, while metal stays bright
   return patchSurface(new THREE.MeshPhysicalMaterial({
-    map, roughnessMap: pt, metalnessMap: pt, bumpMap: pt, bumpScale: 1.6,
+    map, roughnessMap: pt, metalnessMap: pt, bumpMap: pt, bumpScale: cuBump(),
     roughness: 1, metalness: 1, envMapIntensity: 0.75, specularIntensity: 0.4,
   }), curView().s * Wp / curView().W);
 }
@@ -2940,11 +2951,22 @@ function renderFab() {
   el.innerHTML = `<p class="muted" style="margin:0 0 6px">${bad ? `<b style="color:var(--err)">${bad} problem${bad > 1 ? 's' : ''}</b>` : 'No problems found'}${warn ? ` · ${warn} to review` : ''} for ${P.name} standard.${rows.some(r => r.places.length) ? ' Click a row to see it on the board.' : ''}</p>`
     + '<table class="fab">' + rows.map(r =>
       `<tr data-key="${r.key}"${r.places.length ? ' class="go" tabindex="0" title="Show on the board"' : ''}${fabSel?.key === r.key ? ' aria-selected="true"' : ''}><td><span class="fi ${r.st}" aria-label="${r.st}">${icon[r.st]}</span></td><td>${r.label}<span class="lim">${r.limit}</span></td><td class="v">${r.val}${where(r)}</td></tr>`).join('') + '</table>'
+    + (cuOz() > 1 ? `<p class="fabnote"><b>${cuLabel()} copper:</b> the limits above are for 1 oz. Heavier copper needs wider tracks and gaps and may not be offered at every thickness — check the ${P.name} page.</p>` : '')
     + `<p class="fabnote">Measured from the Gerbers; spacing between copper features is not checked. Limits from the <a href="${P.url}" target="_blank" rel="noopener">${P.name} capabilities page</a> (Nov 2026) — check it before ordering.</p>`;
   // keep the row being shown, with its places for the new profile / board
   if (fabSel) { const r = rows.find(q => q.key === fabSel.key); if (r && r.places.length) setFabSel({ key: r.key, i: Math.min(fabSel.i, r.places.length - 1) }, false); else setFabSel(null); }
 }
 document.getElementById('fabProfile').onchange = e => { state.fab = e.target.value; saveSettings(); renderFab(); };
+{
+  const co = document.getElementById('cuOz');
+  if (![...co.options].some(o => +o.value === +state.cuOz)) co.add(new Option(cuLabel(), state.cuOz));
+  co.value = String(state.cuOz);
+  co.onchange = () => {
+    state.cuOz = +co.value; saveSettings();
+    for (const m of board()?.userData.boardMats || []) if (m.bumpMap) m.bumpScale = cuBump();
+    updateInfo(); renderFab();
+  };
+}
 {
   const mv = document.getElementById('minView');
   if (![...mv.options].some(o => +o.value === +state.minView)) mv.add(new Option(state.minView + ' mm view', state.minView));
@@ -3164,6 +3186,7 @@ function updateInfo() {
   if (!b) { info.innerHTML = '<dt>Size</dt><dd>—</dd>'; return; }
   const rows = [
     ['Size', `${fmtL(b.w, false)} × ${fmtL(b.h)}`],
+    ['Copper', cuLabel() + ' outer layers'],
     ['Outline', b.hasOutline
       ? 'From ' + b.outlineFrom + (b.cutouts ? ` · ${b.cutouts} cutout${b.cutouts > 1 ? 's' : ''}` : '') + (b.ignoredShapes ? ` · ${b.ignoredShapes} larger shape${b.ignoredShapes > 1 ? 's' : ''} ignored (drawing frame)` : '')
       : 'Not found · framed around the pads'],

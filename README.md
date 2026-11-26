@@ -29,7 +29,9 @@ No installation, no build step and no server. Files are processed locally in you
 
 - **2D | 3D switch** at the start of the toolbar. 2D is a flat top or bottom view you pan and zoom; 3D lets you rotate the board. The last choice is remembered.
 - **Style switch** in the toolbar: **Layers** (each layer in its own color, like a classic Gerber viewer) or **Realistic** (looks like a manufactured board). 2D and 3D keep their own style; by default 2D uses Layers and 3D uses Realistic.
-- **View buttons**: Top and Bottom in both modes; Iso (angled view) and Flip in 3D. The current view is underlined.
+- **View buttons**: Top and Bottom in both modes; Iso (angled view) and Flip in 3D. The current view is underlined. Top and Bottom always show the board's own top and bottom side, also after Flip.
+- **Sharp close-ups**: when you zoom in and stop moving, the part of the board on screen is redrawn at screen resolution (up to 300 pixels per mm), so pads, tracks and text stay crisp however close you get. The copper edges keep the same raised look in the overview and the close-up.
+- **Closest zoom** is limited (4 mm of board across the view by default, adjustable in Appearance). In 3D the view turns and zooms around the point of the board you are looking at, so zooming in stops at the board surface instead of passing through it.
 - **X-ray**: makes the board material see-through while copper, mask and silkscreen stay solid, so the other side, inner layers and plated holes show through.
 - **Exploded view**: pulls copper, mask, silkscreen, paste and inner layers apart into a stack.
 - **Cross-section**: cuts the board along X or Y at a position you choose.
@@ -64,11 +66,16 @@ Click **Compare…** with a board loaded and pick another version of it: Gerbers
 
 - Checks the board against the published standard limits of **JLCPCB** or **PCBWay** (choose in the panel): board size, narrowest track, smallest plated and non-plated holes, largest hole, via and pad annular rings, hole-to-hole spacing, hole and copper distance to the board edge, and the thinnest silkscreen line.
 - Each line shows the measured value, the limit and ✓ / ! (allowed but below the recommended value) / ✗.
+- **Click a line** to see where it is on the board: every offending place gets a ring (red for problems, amber for warnings) and the view moves to the worst one, turning to the bottom side when needed. A label at the top left gives the value and position; step through the places with **‹ ›** or **N** / **P**, and clear with **Esc** or **×**. Lines that pass show where the closest case is (for example the narrowest track). Hole-to-hole gaps are drawn as a line between the two holes.
+- **Plated hole without pad** lists plated holes that have no copper pad on the outer layers.
+- With copper heavier than 1 oz selected in Appearance, a note says that the listed limits are for 1 oz.
 - Values are measured from the Gerbers. Spacing between copper features is **not** checked, and limits change over time — confirm on the manufacturer's capabilities page before ordering.
 
 ### Appearance
 
 - Solder mask color (green, red, blue, black, white, purple, yellow), surface finish (ENIG, HASL, bare copper), silkscreen color and board thickness (presets from 0.4 to 3.2 mm, or any custom value from 0.1 to 10 mm). Per-side colors can be set with the dots on the file cards.
+- **Copper** weight: 0.5, 1 (default), 2 or 3 oz. Heavier copper makes the copper edges stand out more in Realistic style, is shown in the Board panel and is noted in the fab check.
+- **Closest zoom**: how far you can zoom in, as the smallest piece of board that fills the height of the view (1, 2, 4, 8 or 16 mm; 4 mm by default).
 - **Board material** row: show or hide the board material (in Layers style, the board background), change its color, and set its opacity (the same setting the X-ray button uses).
 - Viewport background: follow the light/dark theme, pick a preset or any custom color.
 - Light, dark or automatic theme (button in the header).
@@ -77,7 +84,7 @@ Click **Compare…** with a board loaded and pick another version of it: Gerbers
 
 - Press **M** or click **Measure**, then click two points. Shows distance, ΔX / ΔY, angle and both coordinates.
 - **Units**: switch between **mm**, **mil** and **inch** in the Board panel; measurements, coordinates, board size, net lengths and the fab check all follow.
-- Points snap to pad, hole and component centres; hold **Alt** to place freely. **Esc** clears.
+- Points snap to pad, hole and component centres within about 12 screen pixels, at any zoom. Clicking anywhere inside a drilled hole measures from its centre, whatever the hole size. Hold **Alt** to place freely. **Esc** clears.
 - The cursor position in board coordinates is shown in the bottom-right corner.
 
 ### Files
@@ -85,7 +92,7 @@ Click **Compare…** with a board loaded and pick another version of it: Gerbers
 - Each file can be removed with its **×** button; **Remove ignored** drops all files that are not drawn; **Clear all** removes everything. Every removal can be undone for a few seconds.
 - Files that are loaded but not drawn (reports, aperture lists, Altium pad masters, mechanical layers, drill drawings / drill maps, binary drill files, EAGLE aperture wheels and drill racks) are listed with a short explanation.
 - Files converted from old EAGLE RS-274D data are marked *converted from RS-274D* on their card, and a notice after loading lists what was corrected. So are files that were skipped: files over 60 MB, zips inside a zip and damaged zips.
-- **Your last board reopens automatically** after a page reload, with a notice that has a **Clear** button.
+- **Your last board reopens automatically** after a page reload, with a notice that has a **Clear** button. Layer types the viewer chose itself are detected again when the board reopens, so improvements in detection apply to saved boards too; a type you picked from the dropdown is kept.
 
 ### Export
 
@@ -101,7 +108,7 @@ Click **Compare…** with a board loaded and pick another version of it: Gerbers
 
 ### Remembered settings
 
-Colors, opacities, style, 2D/3D choice, units, fab-check manufacturer, thickness, background and theme are saved in the browser and restored next time. The loaded files are kept in the browser's own storage (IndexedDB) so the last board reopens after a reload; they never leave your computer, and **Clear all** removes them. Very large sets (over about 150 MB) are not kept.
+Colors, opacities, style, 2D/3D choice, units, fab-check manufacturer, thickness, copper weight, closest zoom, background and theme are saved in the browser and restored next time. The loaded files are kept in the browser's own storage (IndexedDB) so the last board reopens after a reload; they never leave your computer, and **Clear all** removes them. Very large sets (over about 150 MB) are not kept.
 
 ## Supported input
 
@@ -168,7 +175,7 @@ A notice after loading summarises the job: source tool, step, layer, hole and co
 - Format hints from `;FILE_FORMAT=` comments and `METRIC,000.000`-style headers
 - Tool definitions in the header or body
 - Slots via `G85` and routed paths (`G00` / `M15` / `G01` / `M16`)
-- Plated vs. non-plated detection from the file name (`NPTH`) or `TYPE=NON_PLATED` comments
+- Plated vs. non-plated detection from the file name (`NPTH`) or `;TYPE=PLATED` / `;TYPE=NON_PLATED` comments. Altium writes both kinds into one file, each group of tools after its own comment; plating is read per tool, so such a file shows plated vias and non-plated mounting holes correctly
 - Drill data exported in Gerber format is also accepted. Such files rarely say whether they are plated, so unless the `FileFunction` attribute or the file name (`NPTH`, `PTH`) says so, plating is worked out from the copper: a file whose holes sit in copper clearances (clear flashes) or on no pad is non-plated, one whose holes sit on pads is plated. Drill *drawings* (symbol charts such as `.GDD`, `.GG1` or files named *DrillDrawing*) are recognised and not mistaken for drill data.
 
 ### Pick and place (centroid)
@@ -232,8 +239,9 @@ Non-Gerber files inside a zip (PDF, images, `.gbrjob`, reports, etc.) are skippe
 | **F** | Flip the board (3D) |
 | **X** | X-ray on/off |
 | **M** | Measure on/off |
+| **N** / **P** | Next / previous fab-check place |
 | **Alt** (while measuring) | Place a point without snapping |
-| **Esc** | Clear the measurement and net highlight |
+| **Esc** | Clear the measurement, net highlight or fab-check markers |
 | **?** | Show the shortcut list |
 
 Click a pad or track to highlight its net (files with net names).
@@ -248,7 +256,9 @@ Toolbar: **2D | 3D**, **Style** (Layers / Realistic), **Iso**, **Top**, **Bottom
 - **Holes that cannot be cut**: holes that overlap each other, holes at a board corner or on a curved edge, and any beyond 4000, are drawn flat on the surface instead of cut through.
 - **Duplicate holes**: a hole listed in two drill files (EasyEDA puts vias in both the PTH and the via file) is drawn once.
 - **Binary drill files**: Altium's binary EIA `.DRL` cannot be read; use the ASCII NC drill file (`.TXT`) from the same export.
-- **Texture resolution**: this is limited by your GPU (usually 4096 px across the longest board side). Very large boards show less fine detail. While you drag a slider or color on a large board, a quicker lower-resolution preview is shown and the sharp version follows when you stop.
+- **Texture resolution**: the overview is limited by your GPU (usually 4096 px across the longest board side). Close-ups are redrawn sharp about 0.2 s after the view stops moving; until then, and while you rotate or zoom, a large board looks softer up close. X-ray, board opacity below 100 % and the exploded view always use the overview resolution. While you drag a slider or color on a large board, a quicker lower-resolution preview is shown and the sharp version follows when you stop.
+- **Copper weight** only changes how the copper looks and the fab-check note. The board thickness, cross-section and STL / STEP exports do not change with it.
+- **Graphics**: laptops with two GPUs often run the browser on the integrated one. If edges look rough or flicker, set the browser to *High performance* in Windows Settings → System → Display → Graphics, and restart it.
 - **Components are approximate**: parts are simple boxes sized from the package name, not real 3D models. Pin headers and connectors are drawn as their low plastic body.
 - **STEP export** is a mechanical model: the board body and component boxes only, without copper, solder mask or silkscreen. Holes that are drawn flat instead of cut (see *Holes that cannot be cut*) are left out of the solid, and the notice after saving says how many. Plated half-holes are cut as notches but carry no plating. Arcs in the outline are written as short straight segments.
 - **Nested zips**: a zip inside a zip is not opened (it is listed with a note). Extract it first. A `.tgz` inside a zip is opened.
