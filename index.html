@@ -712,7 +712,7 @@ function arcPoints(cx, cy, r, a0, a1, segLen = 0.15) {
    ===================================================================== */
 function parseExcellon(text, name) {
   let unit = 25.4, zeros = 'LZ', fi = 2, fd = 4, fmtSet = false, plated = /npth|non.?plated|unplated/i.test(name) ? false : true;
-  const tools = {}; let cur = null, x = 0, y = 0, route = false, down = false;
+  const tools = {}, toolPlated = {}; let cur = null, x = 0, y = 0, route = false, down = false;
   const holes = [];
   const pnum = (s) => {
     if (s.includes('.')) return parseFloat(s) * unit;
@@ -730,7 +730,10 @@ function parseExcellon(text, name) {
     if (!line) continue;
     if (line.startsWith(';')) {
       const m = line.match(/FILE_FORMAT\s*=\s*(\d+):(\d+)/); if (m) { fi = +m[1]; fd = +m[2]; fmtSet = true; }
+      // Altium writes plated and non-plated tools into one file, each group after its own ;TYPE= comment,
+      // so plating is remembered per tool rather than for the whole file
       if (/TYPE=NON_PLATED|NPTH/.test(line)) plated = false;
+      else if (/TYPE=PLATED|(^|[^N])PTH\b/.test(line)) plated = true;
       continue;
     }
     if (/^(METRIC|M71)/.test(line)) {
@@ -746,7 +749,7 @@ function parseExcellon(text, name) {
       continue;
     }
     const td = line.match(/^T(\d+)(?:[FSBHZ][\d.]*)*C([\d.]+)/);
-    if (td) { tools[+td[1]] = parseFloat(td[2]) * unit; if (/[XY]/.test(line.slice(td[0].length))) {} else continue; }
+    if (td) { tools[+td[1]] = parseFloat(td[2]) * unit; toolPlated[+td[1]] = plated; if (/[XY]/.test(line.slice(td[0].length))) {} else continue; }
     const ts = line.match(/^T(\d+)$/); if (ts) { cur = +ts[1] || null; continue; }
     if (/^(M48|M95|%|G90|G05|M30|M00|FMAT|ICI|M47|G93|VER|DETECT|ATC|OFF)/.test(line) && !/[XY][+-]?\d/.test(line)) {
       if (line.startsWith('G05')) route = false;
@@ -755,7 +758,7 @@ function parseExcellon(text, name) {
     if (line.includes('G85')) {
       const [a, b] = line.split('G85');
       const [x1, y1] = xy(a); x = x1; y = y1; const [x2, y2] = xy(b); x = x2; y = y2;
-      if (cur && tools[cur]) holes.push({ x: x1, y: y1, x2, y2, d: tools[cur], plated });
+      if (cur && tools[cur]) holes.push({ x: x1, y: y1, x2, y2, d: tools[cur], plated: toolPlated[cur] ?? plated });
       continue;
     }
     if (line.startsWith('G00')) { route = true; down = false; [x, y] = xy(line); continue; }
@@ -764,8 +767,8 @@ function parseExcellon(text, name) {
     if (/[XY][+-]?[\d.]/.test(line)) {
       const px = x, py = y; [x, y] = xy(line);
       if (!cur || !tools[cur]) continue;
-      if (route) { if (down && (line.startsWith('G01') || /^[XY]/.test(line))) holes.push({ x: px, y: py, x2: x, y2: y, d: tools[cur], plated }); }
-      else holes.push({ x, y, d: tools[cur], plated });
+      if (route) { if (down && (line.startsWith('G01') || /^[XY]/.test(line))) holes.push({ x: px, y: py, x2: x, y2: y, d: tools[cur], plated: toolPlated[cur] ?? plated }); }
+      else holes.push({ x, y, d: tools[cur], plated: toolPlated[cur] ?? plated });
     }
   }
   return { holes };
@@ -969,7 +972,8 @@ function detectType(name, text) {
   const n = name.toLowerCase();
   const head = text.slice(0, 4000);
   const isExcellon = /^\s*(;[^\n]*\n\s*)*M48/m.test(head) || (/^\s*(METRIC|INCH)/m.test(head) && /^T\d+.*C[\d.]+/m.test(head));
-  if (isExcellon) return /npth|non.?plated|unplated/i.test(n) || /TYPE=NON_PLATED/i.test(head) ? 'drill-npth' : 'drill';
+  // A file that also lists plated tools (Altium's ;TYPE=PLATED / ;TYPE=NON_PLATED sections) is a mixed drill file
+  if (isExcellon) return /npth|non.?plated|unplated/i.test(n) || (/TYPE=NON_PLATED/i.test(head) && !/TYPE=PLATED/i.test(head)) ? 'drill-npth' : 'drill';
   const isGerber = /%FS|%MO|G04|%AD/.test(head);
   if (!isGerber) return looksPnP(name, text) ? 'pnp' : 'ignore';
   const ff = head.match(/%TF\.FileFunction,([^*%]+)/);
@@ -1797,9 +1801,24 @@ function texture(canvas, srgb) {
 // Surface shader tweaks. The copper relief is a bump map: seen from afar, many texels fall in one screen pixel
 // and the relief turns into stair-steps and sparkles on thin tracks, so it fades out as the texture is minified.
 // The close-up patch also cuts itself away outside its own area.
-const BUMP_FADE = THREE.ShaderChunk.bumpmap_pars_fragment
-  .replace('float Hll = bumpScale', 'vec2 bTs = vec2( textureSize( bumpMap, 0 ) );\n\t\tfloat bFoot = max( length( dSTdx * bTs ), length( dSTdy * bTs ) );\n\t\tfloat bK = clamp( ( 2.5 - bFoot ) / 1.5, 0.0, 1.0 );\n\t\tfloat Hll = bK * bumpScale')
-  .replace('float dBx = bumpScale', 'float dBx = bK * bumpScale').replace('float dBy = bumpScale', 'float dBy = bK * bumpScale');
+// The relief is sampled with an even (isotropic) filter, a little wider than one screen pixel, so the bevel along
+// pad and track edges stays a smooth ramp at every zoom and angle. A one-pixel-wide relief line steps every few
+// pixels on a slanted edge, which shows as rows of small notches across parallel pads.
+const BUMP_FADE = THREE.ShaderChunk.bumpmap_pars_fragment.replace(/vec2 dHdxy_fwd\(\) \{[\s\S]*?return vec2\( dBx, dBy \);\s*\}/, `vec2 dHdxy_fwd() {
+		vec2 dSTdx = dFdx( vBumpMapUv );
+		vec2 dSTdy = dFdy( vBumpMapUv );
+		vec2 bTs = vec2( textureSize( bumpMap, 0 ) );
+		float bFoot = max( length( dSTdx * bTs ), length( dSTdy * bTs ) );
+		float bK = clamp( ( 2.5 - bFoot ) / 1.5, 0.0, 1.0 ) * bumpScale;
+		// filter over about two screen pixels and take central differences, so the bevel at a pad edge is a
+		// smooth ramp a few pixels wide instead of a one-pixel line that breaks into steps (notches) on slanted edges
+		float bG = 2.0 * max( length( dSTdx ), length( dSTdy ) );
+		vec2 gx = vec2( bG, 0.0 ), gy = vec2( 0.0, bG );
+		float dBx = 0.5 * bK * ( textureGrad( bumpMap, vBumpMapUv + dSTdx, gx, gy ).x - textureGrad( bumpMap, vBumpMapUv - dSTdx, gx, gy ).x );
+		float dBy = 0.5 * bK * ( textureGrad( bumpMap, vBumpMapUv + dSTdy, gx, gy ).x - textureGrad( bumpMap, vBumpMapUv - dSTdy, gx, gy ).x );
+		return vec2( dBx, dBy );
+	}`);
+if (BUMP_FADE === THREE.ShaderChunk.bumpmap_pars_fragment) console.warn('Relief shader patch did not apply');
 function patchSurface(mat, patchArea) {
   mat.onBeforeCompile = sh => {
     sh.fragmentShader = sh.fragmentShader.replace('#include <bumpmap_pars_fragment>', BUMP_FADE);
@@ -4302,7 +4321,7 @@ async function addFilesInner(list) {
     if (a.ignore) { state.files.push({ id: ++uid, name: a.name, text: '', type: 'ignore', hint: a.hint, legacyRaw: a.legacyRaw }); continue; }
     // Binary files (e.g. Altium's EIA .DRL) are listed with an explanation instead of silently dropped
     if (looksBinary(a.text)) { state.files.push({ id: ++uid, name: a.name, text: '', type: 'ignore', binary: true }); continue; }
-    state.files.push({ id: ++uid, name: a.name, text: a.text, type: detectType(a.name, a.text), legacy: a.legacy });
+    { const t = detectType(a.name, a.text); state.files.push({ id: ++uid, name: a.name, text: a.text, type: t, autoType: t, legacy: a.legacy }); }
   }
   state.setName = g.setName;
   rebuild(true);
@@ -4400,7 +4419,7 @@ function saveSessionSoon() {
   clearTimeout(sessionTimer);
   sessionTimer = setTimeout(async () => {
     try {
-      const files = state.files.map(f => ({ name: f.name, text: f.text, type: f.type, binary: !!f.binary, hint: f.hint || null, hidden: !!f.hidden, legacy: f.legacy || null, legacyRaw: f.legacyRaw || null }));
+      const files = state.files.map(f => ({ name: f.name, text: f.text, type: f.type, autoType: f.autoType || null, binary: !!f.binary, hint: f.hint || null, hidden: !!f.hidden, legacy: f.legacy || null, legacyRaw: f.legacyRaw || null }));
       const size = files.reduce((n, f) => n + f.text.length + (f.legacyRaw?.length || 0), 0);
       await idb.put('session', size < 150e6 ? { files, saved: Date.now() } : null);   // very large sets are not kept
     } catch (e) { /* storage unavailable (private window, blocked site data) */ }
@@ -4411,7 +4430,15 @@ async function restoreSession() {
   try { ses = await idb.get('session'); } catch { return; }
   if (!ses?.files?.length || state.files.length) return;
   restoring = true;
-  for (const f of ses.files) state.files.push({ id: ++uid, name: f.name, text: f.text || '', type: f.type, binary: f.binary, hint: f.hint || undefined, hidden: !!f.hidden, legacy: f.legacy || undefined, legacyRaw: f.legacyRaw || undefined });
+  // A layer type the viewer chose itself is detected again, so files saved by an older version pick up detection
+  // fixes (e.g. Altium drill files with plated and non-plated sections). A type the person picked is kept.
+  const retype = f => {
+    if (!f.text || f.binary || f.legacyRaw) return f.type;
+    const now = detectType(f.name, f.text);
+    if (f.autoType) return f.type === f.autoType ? now : f.type;
+    return /^drill/.test(f.type) && /^drill/.test(now) ? now : f.type;   // saved before autoType existed
+  };
+  for (const f of ses.files) state.files.push({ id: ++uid, name: f.name, text: f.text || '', type: retype(f), autoType: f.text && !f.binary && !f.legacyRaw ? detectType(f.name, f.text) : f.autoType, binary: f.binary, hint: f.hint || undefined, hidden: !!f.hidden, legacy: f.legacy || undefined, legacyRaw: f.legacyRaw || undefined });
   rebuild(true, () => {
     restoring = false;
     showToast(`Reopened your last board (${ses.files.length} file${ses.files.length > 1 ? 's' : ''})`, 'Clear', () => removeFiles(state.files.slice()), 10000);
