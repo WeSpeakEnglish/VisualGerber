@@ -188,10 +188,18 @@ select.mini{font-size:11.5px;padding:2px 4px;text-transform:none;letter-spacing:
 .fi.ok{background:#2e9a5e}.fi.warn{background:#d08a10}.fi.bad{background:#d0342c}.fi.na{background:var(--line);color:var(--muted)}
 .fabnote{font-size:11px;color:var(--muted);margin:8px 0 0;line-height:1.45}
 .fabnote a{color:inherit}
-#netChip{position:absolute;left:12px;top:64px;display:flex;align-items:center;gap:8px;background:var(--glass);backdrop-filter:blur(6px);
-  border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 10px;font-size:12.5px;max-width:calc(100% - 24px);z-index:4}
-#netChip .nc-dot{width:10px;height:10px;border-radius:50%;background:#ffd54a;box-shadow:0 0 0 2px rgba(255,213,74,.35)}
-#netChip button{padding:2px 7px;background:transparent;border-color:transparent;font-size:15px;line-height:1}
+#chips{position:absolute;left:12px;top:64px;display:flex;flex-direction:column;align-items:flex-start;gap:8px;max-width:calc(100% - 24px);z-index:4}
+#fabChip .nc-dot{background:var(--fc,#ff3b47);box-shadow:none}
+#fabChip .muted{font-size:12px}
+.fab tr.go{cursor:pointer}
+.fab tr.go:hover td{background:var(--chip)}
+.fab tr.go:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.fab tr[aria-selected=true] td{background:var(--chip);box-shadow:inset 0 -2px 0 var(--accent)}
+.fab .where{display:block;font-size:11px;color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+#netChip,#fabChip{display:flex;align-items:center;gap:8px;background:var(--glass);backdrop-filter:blur(6px);
+  border:1px solid var(--line);border-radius:10px;padding:6px 6px 6px 10px;font-size:12.5px;max-width:100%}
+#chips .nc-dot{width:10px;height:10px;border-radius:50%;background:#ffd54a;box-shadow:0 0 0 2px rgba(255,213,74,.35)}
+#netChip button,#fabChip button{padding:2px 7px;background:transparent;border-color:transparent;font-size:15px;line-height:1}
 #help{position:absolute;right:12px;top:64px;width:270px;background:var(--panel);border:1px solid var(--line);border-radius:12px;
   box-shadow:0 10px 30px rgba(0,0,0,.2);padding:12px 14px;z-index:6;font-size:12.5px}
 .help-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
@@ -333,7 +341,12 @@ kbd{display:inline-block;min-width:18px;text-align:center;padding:1px 5px;border
       <button id="helpBtn" title="Keyboard shortcuts (?)" aria-expanded="false" aria-controls="help">?</button>
     </div>
     <div id="mlabel"></div>
-    <div id="netChip" hidden><span class="nc-dot"></span><span id="netChipTxt"></span><button id="netChipX" title="Clear highlight (Esc)" aria-label="Clear net highlight">×</button></div>
+    <div id="chips">
+      <div id="netChip" hidden><span class="nc-dot"></span><span id="netChipTxt"></span><button id="netChipX" title="Clear highlight (Esc)" aria-label="Clear net highlight">×</button></div>
+      <div id="fabChip" hidden role="status"><span class="nc-dot" id="fabChipDot"></span><span id="fabChipTxt"></span>
+        <button id="fabPrev" title="Previous place (P)" aria-label="Previous place">‹</button><button id="fabNext" title="Next place (N)" aria-label="Next place">›</button>
+        <button id="fabChipX" title="Clear (Esc)" aria-label="Clear fab check markers">×</button></div>
+    </div>
     <div id="help" hidden role="dialog" aria-label="Keyboard shortcuts">
       <div class="help-h"><b>Keyboard shortcuts</b><button id="helpX" aria-label="Close">×</button></div>
       <dl>
@@ -344,7 +357,8 @@ kbd{display:inline-block;min-width:18px;text-align:center;padding:1px 5px;border
         <dt><kbd>X</kbd></dt><dd>X-ray on/off</dd>
         <dt><kbd>M</kbd></dt><dd>Measure on/off</dd>
         <dt><kbd>Alt</kbd></dt><dd>Measure without snapping</dd>
-        <dt><kbd>Esc</kbd></dt><dd>Clear measurement / net highlight</dd>
+        <dt><kbd>N</kbd> <kbd>P</kbd></dt><dd>Next / previous fab check place</dd>
+        <dt><kbd>Esc</kbd></dt><dd>Clear measurement / highlight / fab markers</dd>
         <dt><kbd>?</kbd></dt><dd>Show this list</dd>
       </dl>
       <p class="muted">Mouse: click a pad or track to highlight its net (files with net names). Hover shows net, pin and part.</p>
@@ -1078,7 +1092,31 @@ function renderOps(ctx, ops, view) {
   ctx.setTransform(view.s, 0, 0, -view.s, -view.minX * view.s, view.maxY * view.s);
   ctx.fillStyle = ctx.strokeStyle = '#fff';
   ctx.lineJoin = 'round';
+  // Round-ended tracks of one width and polarity that follow each other are stroked as one path. Drawn one by
+  // one, the soft (anti-aliased) edges of two segments overlap at every joint and leave a small tick there.
+  let batch = null;
+  // the batch is stroked with its own polarity: the op that ends it may draw or erase differently
+  const flush = () => { if (batch) { ctx.globalCompositeOperation = batch.dark ? 'source-over' : 'destination-out'; ctx.lineWidth = batch.w; ctx.lineCap = 'round'; ctx.stroke(); batch = null; } };
+  const join = (w, dark, x, y) => {
+    if (!batch || Math.abs(batch.w - w) > 1e-9 || batch.dark !== dark) { flush(); ctx.beginPath(); batch = { w, dark, x: Infinity, y: Infinity }; }
+    if (!(Math.abs(batch.x - x) <= 1e-9 && Math.abs(batch.y - y) <= 1e-9)) ctx.moveTo(x, y);
+  };
   for (const o of ops) {
+    if (o.t === 'line' && o.ap.t !== 'R' || o.t === 'arc') {
+      const ap = o.ap, w = o.t === 'arc'
+        ? (ap.t === 'C' ? ap.d : ap.t === 'R' || ap.t === 'O' ? Math.min(ap.w, ap.h) : 0.1) * opScale(o)
+        : (ap.t === 'C' ? ap.d : ap.t === 'O' ? Math.min(ap.w, ap.h) : ap.t === 'P' ? ap.d : 0.1) * opScale(o);
+      if (o.t === 'line' && Math.hypot(o.x2 - o.x1, o.y2 - o.y1) >= 1e-9) {
+        join(Math.max(w, 1e-4), o.dark, o.x1, o.y1); ctx.lineTo(o.x2, o.y2); batch.x = o.x2; batch.y = o.y2;
+        continue;
+      }
+      if (o.t === 'arc') {
+        join(Math.max(w, 1e-4), o.dark, o.cx + Math.cos(o.a0) * o.r, o.cy + Math.sin(o.a0) * o.r);
+        ctx.arc(o.cx, o.cy, o.r, o.a0, o.a1, o.a1 < o.a0); batch.x = o.cx + Math.cos(o.a1) * o.r; batch.y = o.cy + Math.sin(o.a1) * o.r;
+        continue;
+      }
+    }
+    flush();
     ctx.globalCompositeOperation = o.dark ? 'source-over' : 'destination-out';
     if (o.t === 'flash') {
       ctx.save(); ctx.translate(o.x, o.y);
@@ -1114,6 +1152,7 @@ function renderOps(ctx, ops, view) {
       }
     }
   }
+  flush();
   ctx.globalCompositeOperation = 'source-over';
 }
 
@@ -1350,6 +1389,7 @@ function animate(t) {
     for (const o of g.children) if (!o.userData.helper) o.renderOrder = s * (o.position.z + (o.userData.zoff || 0));
     placeMeasureLabel(g);
     fitClipPlanes(g);
+    watchDetail(g, t);
   }
   renderer.render(scene, cam);
 }
@@ -1546,10 +1586,13 @@ const put = (ctx, src, a) => { if (a <= 0) return; ctx.globalAlpha = Math.min(1,
 const clipTo = (canvas, mask, op) => { const x = canvas.getContext('2d'); x.globalCompositeOperation = op; x.drawImage(mask, 0, 0, canvas.width, canvas.height); x.globalCompositeOperation = 'source-over'; return canvas; };
 // While a slider or colour is being dragged, surfaces are drawn at preview size (max 1024 px) and redrawn sharp when idle
 let draftPass = false;
-const drawScale = () => draftPass && built ? Math.min(1, 1024 / Math.max(built.view.W, built.view.H)) : 1;
-const scaledSize = () => { const k = drawScale(); return [Math.max(4, Math.round(built.view.W * k)), Math.max(4, Math.round(built.view.H * k))]; };
+const drawScale = () => draftPass && built && !detailView ? Math.min(1, 1024 / Math.max(built.view.W, built.view.H)) : 1;
+// Close-up detail: when set, surfaces are drawn for this sub-region of the board at a higher resolution
+let detailView = null;
+const curView = () => detailView || built.view;
+const scaledSize = () => { const v = curView(), k = drawScale(); return [Math.max(4, Math.round(v.W * k)), Math.max(4, Math.round(v.H * k))]; };
 // Board-to-canvas transform for a canvas of any size
-const boardTransform = (ctx) => { const v = built.view, k = ctx.canvas.width / v.W; ctx.setTransform(v.s * k, 0, 0, -v.s * k, -v.minX * v.s * k, v.maxY * v.s * k); return v.s * k; };
+const boardTransform = (ctx) => { const v = curView(), k = ctx.canvas.width / v.W; ctx.setTransform(v.s * k, 0, 0, -v.s * k, -v.minX * v.s * k, v.maxY * v.s * k); return v.s * k; };
 
 let built = null; // geometry/raster cache for appearance-only updates
 const compCache = new Map(), geoCache = new Map();
@@ -1560,16 +1603,40 @@ function clearCaches() {
 }
 function disposeBuild() { if (built?.disp) for (const x of built.disp) x?.dispose?.(); if (built) built.disp = []; }
 
+// Bounding box of a drawing object (cached), used to skip objects outside a close-up region
+const cullBoxes = new WeakMap();
+function cullBox(o) {
+  let b = cullBoxes.get(o); if (b) return b;
+  if (o.t === 'region') b = opBox(o);
+  else {
+    const r = apSize(o.ap) * opScale(o) / 2;
+    if (o.t === 'flash') b = [o.x - r, o.y - r, o.x + r, o.y + r];
+    else if (o.t === 'line') b = [Math.min(o.x1, o.x2) - r, Math.min(o.y1, o.y2) - r, Math.max(o.x1, o.x2) + r, Math.max(o.y1, o.y2) + r];
+    else if (o.t === 'arc') b = [o.cx - o.r - r, o.cy - o.r - r, o.cx + o.r + r, o.cy + o.r + r];
+  }
+  b = b || [-Infinity, -Infinity, Infinity, Infinity];
+  cullBoxes.set(o, b); return b;
+}
+function drawLayerOps(ops) {
+  const v = curView(), c = makeCanvas(v.W, v.H);
+  if (detailView) {
+    const r = detailView.rect, m = 0.05;
+    ops = ops.filter(o => { const b = cullBox(o); return b[2] >= r[0] - m && b[0] <= r[2] + m && b[3] >= r[1] - m && b[1] <= r[3] + m; });
+  }
+  if (ops.length) renderOps(c.getContext('2d'), ops, v);
+  return c;
+}
 function rasterOf(t) {
   if (!built) return null;
-  if (t in built.raster) return built.raster[t];
-  const ops = opsOf(t); let c = null;
-  if (ops.length) { c = makeCanvas(built.view.W, built.view.H); renderOps(c.getContext('2d'), ops, built.view); }
-  return built.raster[t] = c;
+  const cache = detailView ? detailView.raster : built.raster;
+  if (t in cache) return cache[t];
+  const ops = opsOf(t);
+  return cache[t] = ops.length ? drawLayerOps(ops) : null;
 }
 function innerRaster(i) {
   const r = built.inners[i];
-  if (!r.c) { r.c = makeCanvas(built.view.W, built.view.H); renderOps(r.c.getContext('2d'), r.f.parsed.ops, built.view); }
+  if (detailView) return detailView.inner[i] ||= drawLayerOps(r.f.parsed.ops);
+  if (!r.c) r.c = drawLayerOps(r.f.parsed.ops);
   return r.c;
 }
 
@@ -1727,6 +1794,22 @@ function texture(canvas, srgb) {
   return t;
 }
 
+// Surface shader tweaks. The copper relief is a bump map: seen from afar, many texels fall in one screen pixel
+// and the relief turns into stair-steps and sparkles on thin tracks, so it fades out as the texture is minified.
+// The close-up patch also cuts itself away outside its own area.
+const BUMP_FADE = THREE.ShaderChunk.bumpmap_pars_fragment
+  .replace('float Hll = bumpScale', 'vec2 bTs = vec2( textureSize( bumpMap, 0 ) );\n\t\tfloat bFoot = max( length( dSTdx * bTs ), length( dSTdy * bTs ) );\n\t\tfloat bK = clamp( ( 2.5 - bFoot ) / 1.5, 0.0, 1.0 );\n\t\tfloat Hll = bK * bumpScale')
+  .replace('float dBx = bumpScale', 'float dBx = bK * bumpScale').replace('float dBy = bumpScale', 'float dBy = bK * bumpScale');
+function patchSurface(mat, patchArea) {
+  mat.onBeforeCompile = sh => {
+    sh.fragmentShader = sh.fragmentShader.replace('#include <bumpmap_pars_fragment>', BUMP_FADE);
+    if (patchArea) sh.fragmentShader = sh.fragmentShader.replace('#include <clipping_planes_fragment>',
+      '#include <clipping_planes_fragment>\n if (vMapUv.x < 0.0 || vMapUv.x > 1.0 || vMapUv.y < 0.0 || vMapUv.y > 1.0) discard;');
+  };
+  mat.customProgramCacheKey = () => patchArea ? 'pcb-surface-patch' : 'pcb-surface';
+  return mat;
+}
+
 // Realistic surface: colour texture plus a packed PBR texture (R = bump, G = roughness, B = metalness)
 function composeSide(side) {
   const [Wp, Hp] = scaledSize();
@@ -1779,10 +1862,10 @@ function composeSide(side) {
   const map = texture(col, true), pt = texture(pbr, false);
   // Physical material: specularIntensity only weakens the reflection of non-metals (mask, silk, laminate),
   // so the mask keeps its real depth of colour instead of mirroring the bright studio, while metal stays bright
-  return new THREE.MeshPhysicalMaterial({
+  return patchSurface(new THREE.MeshPhysicalMaterial({
     map, roughnessMap: pt, metalnessMap: pt, bumpMap: pt, bumpScale: 1.6,
     roughness: 1, metalness: 1, envMapIntensity: 0.75, specularIntensity: 0.4,
-  });
+  }), false);
 }
 
 // Classic Gerber-viewer look: every layer in its own colour, unlit
@@ -1914,6 +1997,7 @@ const innerCanvas = i => tinted(innerRaster(i), PCOL('inner'), makeCanvas(...sca
 
 function buildGeometry() {
   if (!built) return;
+  removeDetail(board()); detailDirty = true; detailT = performance.now();
   disposeBuild();
   boardRoot.clear();
   const { cut, cx, cy } = built;
@@ -1994,6 +2078,7 @@ function buildGeometry() {
   layoutStack(g);
   updateMaterials();
   updateClipping();
+  drawFabMarkers();
 }
 
 function layoutStack(g) {
@@ -2011,6 +2096,7 @@ function layoutStack(g) {
   }
   for (const im of g.userData.compMeshes.concat(g.userData.compLines || [])) im.position.z = im.userData.side === 'b' ? g.userData.surf.bot : g.userData.surf.top;
   for (const m of g.userData.netOv || []) m.position.z = m.userData.side === 'top' ? g.userData.surf.top + 0.06 : g.userData.surf.bot - 0.06;
+  if (g.userData.fabMk?.length) drawFabMarkers();
   updateMeasureHelpers();
 }
 
@@ -2095,6 +2181,109 @@ function updateMaterials() {
     if (m.side !== side) { m.side = side; m.needsUpdate = true; }
   }
   for (const s of g.userData.innerSheets) s.visible = tr;
+  const dt = g.userData.detail;
+  if (dt) { if (tr) removeDetail(g); else if (dt.mesh.material.userData.cap) dt.mesh.material.envMapIntensity = state.is2D ? 0.45 : 0.75; }
+  detailDirty = true;
+}
+
+/* ---------- Close-up detail ----------
+   The board surface is one texture of at most 4096 px, so close up its pixels show as soft, stepped edges.
+   Once the view settles, the part of the board on screen is redrawn at screen resolution into a second
+   texture, laid over the surface on a matching sheet. Only for a solid (not see-through, not exploded) board. */
+let detailDirty = true, detailT = 0, detailSig = '';
+const DETAIL_MAX_PXMM = 300;   // 3.3 µm per pixel
+function removeDetail(g) {
+  const dt = g?.userData.detail; if (!dt) return;
+  g.remove(dt.mesh); disposeMat(dt.mesh.material); g.userData.detail = null;
+}
+function watchDetail(g, t) {
+  // Rounded, so the last-digit jitter of a resting camera does not count as movement
+  const e = cam.matrixWorld.elements, p = cam.projectionMatrix.elements, w = g.matrixWorld.elements;
+  const unit = Math.max(1e-6, (cam.isOrthographicCamera ? (cam.top - cam.bottom) / cam.zoom : cam.position.distanceTo(controls.target)) * 2e-4);
+  const R = (a, i) => Math.round(a[i] * 1e4), T = (a, i) => Math.round(a[i] / unit);
+  const sig = [0, 1, 2, 4, 5, 6, 8, 9, 10].map(i => R(e, i) + ',' + R(w, i)).join() + '|' + [12, 13, 14].map(i => T(e, i) + ',' + T(w, i)).join()
+    + '|' + p[0].toPrecision(4) + ',' + p[5].toPrecision(4) + '|' + renderer.domElement.width + 'x' + renderer.domElement.height;
+  if (sig !== detailSig) {
+    detailSig = sig; detailT = t; detailDirty = true;
+    const cur = g.userData.detail;
+    if (cur?.mesh.visible) {
+      const q = detailRegion(g), c = cur.r;
+      if (!q || q.side !== cur.side || c[0] > q.r[0] + 1e-6 || c[1] > q.r[1] + 1e-6 || c[2] < q.r[2] - 1e-6 || c[3] < q.r[3] - 1e-6) cur.mesh.visible = false;
+    }
+    return;
+  }
+  if (detailDirty && t - detailT > 200 && !busy.classList.contains('on')) {
+    detailDirty = false;
+    try { updateDetail(g); } catch (err) { console.error(err); removeDetail(g); }
+  }
+}
+const dRay = new THREE.Raycaster(), dNdc = new THREE.Vector2(), dInv = new THREE.Matrix4(), dHit = new THREE.Vector3(), dW = new THREE.Vector3();
+// Which part of the board needs a sharper picture for the current view, and at what resolution (null: none)
+function detailRegion(g) {
+  if (!built || g.userData.exploded || subOpacity() < 0.999) return null;
+  g.updateMatrixWorld(); tmpV.copy(cam.position); g.worldToLocal(tmpV);
+  const side = tmpV.z >= 0 ? 'top' : 'bottom', zs = side === 'top' ? g.userData.surf.top : g.userData.surf.bot;
+  const { b, cx, cy } = built, base = built.view.s, dpr = renderer.getPixelRatio();
+  // Sample the screen on a grid: where the board is hit and how many texels per mm that spot needs
+  const N = 11, hits = [], plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -zs);
+  dInv.copy(g.matrixWorld).invert();
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    dNdc.set(i / (N - 1) * 2 - 1, j / (N - 1) * 2 - 1); dRay.setFromCamera(dNdc, cam);
+    const ray = dRay.ray.clone().applyMatrix4(dInv);
+    if (!ray.intersectPlane(plane, dHit)) { hits.push(null); continue; }
+    const x = dHit.x + cx, y = dHit.y + cy;
+    if (x < b[0] - 1 || x > b[2] + 1 || y < b[1] - 1 || y > b[3] + 1) { hits.push(null); continue; }
+    dW.copy(dHit); g.localToWorld(dW);
+    hits.push({ x, y, need: Math.min(DETAIL_MAX_PXMM, dpr / mmPerPixel(dW)) });
+  }
+  // Region: the samples where the base texture is too coarse, plus their neighbours
+  const thr = base * 1.3, r = [Infinity, Infinity, -Infinity, -Infinity]; let need = 0;
+  for (const h of hits) if (h && h.need >= thr) need = Math.max(need, h.need);
+  if (!need) return null;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const h = hits[j * N + i]; if (!h || h.need < base * 0.6) continue;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= N || jj >= N) continue;
+      const q = hits[jj * N + ii] || h;
+      r[0] = Math.min(r[0], q.x); r[1] = Math.min(r[1], q.y); r[2] = Math.max(r[2], q.x); r[3] = Math.max(r[3], q.y);
+    }
+  }
+  if (!need) return null;
+  const mg = Math.max(0.3, 0.06 * Math.max(r[2] - r[0], r[3] - r[1]));
+  r[0] = Math.max(b[0], r[0] - mg); r[1] = Math.max(b[1], r[1] - mg); r[2] = Math.min(b[2], r[2] + mg); r[3] = Math.min(b[3], r[3] + mg);
+  const rw = r[2] - r[0], rh = r[3] - r[1]; if (rw <= 0 || rh <= 0) return null;
+  const budget = Math.min(8e6, renderer.domElement.width * renderer.domElement.height * 1.6);
+  const d = Math.min(need, maxTex / rw, maxTex / rh, Math.sqrt(budget / (rw * rh)));
+  if (d < base * 1.25) return null;
+  return { side, zs, r, d };
+}
+function updateDetail(g) {
+  const q = detailRegion(g); if (!q) { removeDetail(g); return; }
+  const { side, zs, r, d } = q, { b } = built, rw = r[2] - r[0], rh = r[3] - r[1];
+  // The current close-up still covers this view sharply enough: keep it
+  const cur = g.userData.detail;
+  if (cur && cur.side === side && cur.style === curStyle() && cur.r[0] <= r[0] + 1e-6 && cur.r[1] <= r[1] + 1e-6 && cur.r[2] >= r[2] - 1e-6 && cur.r[3] >= r[3] - 1e-6 && cur.d >= d * 0.8) { cur.mesh.visible = true; return; }
+
+  const W = Math.max(4, Math.round(rw * d)), H = Math.max(4, Math.round(rh * d));
+  detailView = { minX: r[0], maxY: r[3], s: d, W, H, rect: r, raster: {}, inner: [] };
+  let mat;
+  try { mat = isLayers() ? composeLayers(side) : composeSide(side); } finally { detailView = null; }
+  const Wb = b[2] - b[0], Hb = b[3] - b[1];
+  const u0 = (r[0] - b[0]) / Wb, u1 = (r[0] + W / d - b[0]) / Wb, v1 = (r[3] - b[1]) / Hb, v0 = (r[3] - H / d - b[1]) / Hb;
+  for (const tx of new Set([mat.map, mat.roughnessMap].filter(Boolean))) {
+    tx.wrapS = tx.wrapT = THREE.ClampToEdgeWrapping;
+    tx.repeat.set(1 / (u1 - u0), 1 / (v1 - v0)); tx.offset.set(-u0 / (u1 - u0), -v0 / (v1 - v0));
+  }
+  // Outside the patch the sheet is cut away in the shader, so the clamped texture leaves no smear or edge line
+  patchSurface(mat, true);
+  Object.assign(mat, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4, side: side === 'top' ? THREE.FrontSide : THREE.BackSide });
+  if (mat.isMeshPhysicalMaterial) { mat.userData.cap = true; mat.envMapIntensity = state.is2D ? 0.45 : 0.75; }
+  clip(mat);
+  removeDetail(g);
+  const mesh = new THREE.Mesh(sheetGeo(L('holes').on), mat);
+  mesh.position.z = zs; mesh.userData.helper = true; mesh.renderOrder = 0.5;
+  g.add(mesh);
+  g.userData.detail = { mesh, side, style: curStyle(), r: [r[0], r[3] - H / d, r[0] + W / d, r[3]], d };
 }
 
 function updateClipping() {
@@ -2177,11 +2366,20 @@ function placeMeasureLabel(g) {
   mlabel.style.top = ((1 - tmpV.y) / 2 * viewEl.clientHeight) + 'px';
   mlabel.style.display = 'block';
 }
+// Snap target near a board point: the centre of the hole the point is inside, else the nearest pad / hole / part
+// centre within r (mm). Holes come first, so clicking anywhere inside a hole measures from its centre.
 function snapPt(x, y, r = 0.6) {
   if (!built) return null;
-  let best = null, bd = r;
-  const gx = Math.floor(x), gy = Math.floor(y);
-  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const p of built.snap.get((gx + i) + ',' + (gy + j)) || []) {
+  let best = null, bd = Infinity;
+  for (const h of built.holes) {
+    if (h.x2 != null) continue;
+    const d = Math.hypot(h.x - x, h.y - y);
+    if (d <= Math.max(h.d / 2, r) && d < bd) { bd = d; best = [h.x, h.y]; }
+  }
+  if (best) return best;
+  bd = r;
+  const gx = Math.floor(x), gy = Math.floor(y), n = Math.ceil(r);
+  for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) for (const p of built.snap.get((gx + i) + ',' + (gy + j)) || []) {
     const d = Math.hypot(p[0] - x, p[1] - y); if (d < bd) { bd = d; best = p; }
   }
   return best;
@@ -2193,12 +2391,29 @@ function pickAt(e, objs) {
   ray.setFromCamera(ndc, cam);
   return ray.intersectObjects(objs, false).filter(h => !clipPlanes.length || clipPlanes[0].distanceToPoint(h.point) >= -1e-6);
 }
+const bhInv = new THREE.Matrix4(), bhCam = new THREE.Vector3();
 function boardHit(e) {
   const g = board(); if (!g || !built) return null;
-  const hits = pickAt(e, g.userData.pick); if (!hits.length) return null;
-  const p = g.worldToLocal(hits[0].point.clone());
-  let pt = { x: p.x, y: p.y, side: p.z >= 0 ? 'top' : 'bot', snapped: false };
-  if (!e.altKey) { const s = snapPt(p.x + built.cx, p.y + built.cy); if (s) pt = { x: s[0] - built.cx, y: s[1] - built.cy, side: pt.side, snapped: true }; }
+  const hits = pickAt(e, g.userData.pick);
+  let p, side, world;
+  if (hits.length) { world = hits[0].point; p = g.worldToLocal(world.clone()); side = p.z >= 0 ? 'top' : 'bot'; }
+  else {
+    // Nothing solid under the cursor (e.g. inside a drilled hole): use the board surface facing the camera
+    g.updateMatrixWorld(); bhInv.copy(g.matrixWorld).invert();
+    bhCam.copy(cam.position).applyMatrix4(bhInv); side = bhCam.z >= 0 ? 'top' : 'bot';
+    const z = side === 'top' ? g.userData.surf.top : g.userData.surf.bot;
+    p = ray.ray.clone().applyMatrix4(bhInv).intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), -z), new THREE.Vector3());
+    if (!p) return null;
+    const bx = p.x + built.cx, by = p.y + built.cy, b = built.b;
+    if (bx < b[0] - 0.5 || bx > b[2] + 0.5 || by < b[1] - 0.5 || by > b[3] + 0.5) return null;
+    world = g.localToWorld(p.clone());
+  }
+  let pt = { x: p.x, y: p.y, side, snapped: false };
+  if (!e.altKey) {
+    const tol = Math.min(3, Math.max(0.15, 12 * mmPerPixel(world)));   // about 12 screen pixels
+    const s = snapPt(p.x + built.cx, p.y + built.cy, tol);
+    if (s) pt = { x: s[0] - built.cx, y: s[1] - built.cy, side, snapped: true };
+  }
   pt.rx = p.x + built.cx; pt.ry = p.y + built.cy;   // exact board point under the cursor
   return pt;
 }
@@ -2467,6 +2682,8 @@ function padInRadius(o) {
   }
   return apSize(ap) / 2 * k;
 }
+// Measures the board and remembers where each value comes from, so a row of the check can point at the spot.
+// Each item: { v: value in mm, x, y: board point, s: feature size for zooming, side: 'top' | 'bottom' | 'both', bx, by: second point for gaps }
 function fabStats() {
   if (built.fab) return built.fab;
   const { outer, cutouts, holes, b, castell } = built, polys = [outer, ...cutouts];
@@ -2475,114 +2692,232 @@ function fabStats() {
   const nearCastell = (x, y, r) => castell.some(h => Math.hypot(x - h.x, y - h.y) < h.d / 2 + r + 1.2);
   const cutBoxes = cutouts.map(polyBounds);
   const onBoard = (x, y) => pip([x, y], outer) && !cutouts.some(c => pip([x, y], c));
-  // distance to the nearest board edge, skipping points clearly far from every edge
+  // distance to the nearest board edge (and the edge point), skipping points clearly far from every edge
   const edgeDist = (x, y, near = 3) => {
     const far = Math.min(x - b[0], b[2] - x, y - b[1], b[3] - y) > near && !cutBoxes.some(c => x > c[0] - near && x < c[2] + near && y > c[1] - near && y < c[3] + near);
     return far ? Infinity : Math.min(...polys.map(p => distToPoly([x, y], p)));
   };
+  const sideOf = t => t.startsWith('top') ? 'top' : t.startsWith('bottom') ? 'bottom' : 'both';
+  const it = { trace: [], edge: [], pth: [], npth: [], drill: [], viaRing: [], padRing: [], noPad: [], holeEdge: [], gapVia: [], gapPad: [], silk: [], castell: [] };
   const copperLayers = ['top-copper', 'bottom-copper'].filter(t => opsOf(t).length).length + built.inners.length;
-  let minTrace = Infinity, edge = Infinity, edgeAt = null;
-  const copperOps = ['top-copper', 'bottom-copper', 'inner'].flatMap(t => opsOf(t));
-  for (const o of copperOps) {
+  const arcMid = o => { const a = (o.a0 + o.a1) / 2; return [o.cx + Math.cos(a) * o.r, o.cy + Math.sin(a) * o.r]; };
+  for (const t of ['top-copper', 'bottom-copper', 'inner']) for (const o of opsOf(t)) {
     if (!o.dark) continue;
+    const side = sideOf(t);
     if (o.t === 'line' || o.t === 'arc') {
       const w = traceWidth(o);
-      if (w > 0.01 && (onBoard(o.x1, o.y1) || onBoard(o.x2, o.y2)) && w < minTrace) minTrace = w;
+      if (w > 0.01 && (onBoard(o.x1, o.y1) || onBoard(o.x2, o.y2))) {
+        const [mx, my] = o.t === 'arc' ? arcMid(o) : [(o.x1 + o.x2) / 2, (o.y1 + o.y2) / 2];
+        it.trace.push({ v: w, x: mx, y: my, s: Math.max(w * 10, 0.5), side });
+      }
     }
     const pts = o.t === 'flash' ? [[o.x, o.y, apSize(o.ap) * opScale(o) / 2]]
       : o.t === 'line' ? [[o.x1, o.y1, traceWidth(o) / 2], [o.x2, o.y2, traceWidth(o) / 2], [(o.x1 + o.x2) / 2, (o.y1 + o.y2) / 2, traceWidth(o) / 2]]
       : o.t === 'arc' ? [[o.x1, o.y1, traceWidth(o) / 2], [o.x2, o.y2, traceWidth(o) / 2]]
       : o.t === 'region' ? (opBox(o), o._poly.flat().map(([x, y]) => [x, y, 0])) : [];
+    let best = null;
     for (const [x, y, r] of pts) {
       if (!onBoard(x, y) || (castell.length && nearCastell(x, y, r))) continue;
       const d = edgeDist(x, y, 3 + r) - r;
-      if (d < edge) { edge = d; edgeAt = [x, y]; }
+      if (isFinite(d) && (!best || d < best.v)) best = { v: d, x, y, s: Math.max(1, r * 4), side };
     }
+    if (best) it.edge.push(best);
   }
   // drills
   const round = holes.filter(h => h.x2 == null);
-  const pth = round.filter(h => h.plated), npth = round.filter(h => !h.plated);
-  const minOf = (a, f) => a.length ? Math.min(...a.map(f)) : null;
+  for (const h of round) (h.plated ? it.pth : it.npth).push({ v: h.d, x: h.x, y: h.y, s: h.d * 3, side: 'both' });
+  for (const h of holes) it.drill.push({ v: h.d, x: h.x, y: h.y, s: h.d * 3, side: 'both' });
   // annular rings: pads centred on plated holes, on the outer copper layers
   const flashGrid = new Map();
   for (const t of ['top-copper', 'bottom-copper']) for (const o of opsOf(t)) if (o.t === 'flash' && o.dark) {
     const k = Math.round(o.x / 0.5) + ',' + Math.round(o.y / 0.5); (flashGrid.get(k) || flashGrid.set(k, []).get(k)).push(o);
   }
-  let viaRing = Infinity, padRing = Infinity, noPad = 0;
-  for (const h of pth) {
+  for (const h of round.filter(h => h.plated)) {
     let best = null;
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const o of flashGrid.get((Math.round(h.x / 0.5) + i) + ',' + (Math.round(h.y / 0.5) + j)) || [])
       if (Math.hypot(o.x - h.x, o.y - h.y) < 0.02) { const r = padInRadius(o) - h.d / 2; best = best == null ? r : Math.min(best, r); }
-    if (best == null) { noPad++; continue; }
-    if (h.d <= 0.45) viaRing = Math.min(viaRing, best); else padRing = Math.min(padRing, best);
+    const item = { v: best, x: h.x, y: h.y, s: h.d * 4, side: 'both' };
+    if (best == null) { it.noPad.push({ ...item, v: h.d }); continue; }
+    (h.d <= 0.45 ? it.viaRing : it.padRing).push(item);
   }
   // hole to edge, hole to hole
-  let holeEdge = Infinity, gapVia = Infinity, gapPad = Infinity;
   for (const h of holes) {
     if (castSet.has(h)) continue;
     const ends = h.x2 != null ? [[h.x, h.y], [h.x2, h.y2]] : [[h.x, h.y]];
-    for (const [x, y] of ends) holeEdge = Math.min(holeEdge, edgeDist(x, y, 3 + h.d) - h.d / 2);
+    for (const [x, y] of ends) { const d = edgeDist(x, y, 3 + h.d) - h.d / 2; if (isFinite(d)) it.holeEdge.push({ v: d, x, y, s: h.d * 4, side: 'both' }); }
   }
-  const hg = new Map();
+  const hg = new Map(), idx = new Map(round.map((h, i) => [h, i]));
   for (const h of round) { const k = Math.floor(h.x / 2) + ',' + Math.floor(h.y / 2); (hg.get(k) || hg.set(k, []).get(k)).push(h); }
   for (const h of round) {
     const gx = Math.floor(h.x / 2), gy = Math.floor(h.y / 2);
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const o of hg.get((gx + i) + ',' + (gy + j)) || []) {
-      if (o === h) continue;
+      if (idx.get(o) <= idx.get(h)) continue;           // each pair once
       const gap = Math.hypot(o.x - h.x, o.y - h.y) - (o.d + h.d) / 2;
       if (gap < -0.001) continue;                       // overlapping holes are reported by the hole cutter, not here
-      if (h.d <= 0.45 && o.d <= 0.45) gapVia = Math.min(gapVia, gap); else gapPad = Math.min(gapPad, gap);
+      const item = { v: gap, x: (h.x + o.x) / 2, y: (h.y + o.y) / 2, ax: h.x, ay: h.y, bx: o.x, by: o.y, s: Math.hypot(o.x - h.x, o.y - h.y) + Math.max(h.d, o.d), side: 'both' };
+      (h.d <= 0.45 && o.d <= 0.45 ? it.gapVia : it.gapPad).push(item);
     }
   }
-  let silk = Infinity;
   for (const t of ['top-silk', 'bottom-silk']) for (const o of opsOf(t)) if ((o.t === 'line' || o.t === 'arc') && o.dark && (onBoard(o.x1, o.y1) || onBoard(o.x2, o.y2))) {
-    const w = traceWidth(o); if (w > 0.01) silk = Math.min(silk, w);
+    const w = traceWidth(o); if (w <= 0.01) continue;
+    const [mx, my] = o.t === 'arc' ? arcMid(o) : [(o.x1 + o.x2) / 2, (o.y1 + o.y2) / 2];
+    it.silk.push({ v: w, x: mx, y: my, s: Math.max(w * 10, 0.5), side: sideOf(t) });
   }
-  const fin = v => isFinite(v) ? v : null;
+  for (const h of castell) it.castell.push({ v: h.d, x: h.x, y: h.y, s: h.d * 4, side: 'both' });
+  const mn = a => a.length ? a.reduce((m, q) => Math.min(m, q.v), Infinity) : null;
   return built.fab = {
-    W: built.W, H: built.H, layers: copperLayers, minTrace: fin(minTrace), edge: fin(edge), edgeAt,
-    minPTH: minOf(pth, h => h.d), minNPTH: minOf(npth, h => h.d), maxDrill: minOf(holes, h => -h.d) != null ? -minOf(holes, h => -h.d) : null,
-    viaRing: fin(viaRing), padRing: fin(padRing), noPad, holeEdge: fin(holeEdge), gapVia: fin(gapVia), gapPad: fin(gapPad), silk: fin(silk),
-    nHoles: holes.length, castell: castell.length,
+    W: built.W, H: built.H, layers: copperLayers, items: it,
+    minTrace: mn(it.trace), edge: mn(it.edge), minPTH: mn(it.pth), minNPTH: mn(it.npth),
+    maxDrill: it.drill.length ? Math.max(...it.drill.map(q => q.v)) : null,
+    viaRing: mn(it.viaRing), padRing: mn(it.padRing), noPad: it.noPad.length, holeEdge: mn(it.holeEdge),
+    gapVia: mn(it.gapVia), gapPad: mn(it.gapPad), silk: mn(it.silk), nHoles: holes.length, castell: castell.length,
   };
 }
+let fabRows = [];          // rows of the last render, with the places each one points at
+let fabSel = null;         // { key, i } — the row being shown on the board
 function renderFab() {
   const el = document.getElementById('fab'), sel = document.getElementById('fabProfile');
   sel.value = state.fab;
-  if (!built) { el.innerHTML = '<p class="muted" style="margin:0">Load a board to check it against the manufacturer\'s limits.</p>'; return; }
-  const P = FAB[state.fab] || FAB.jlc, f = fabStats(), n = Math.max(1, f.layers);
+  if (!built) { fabRows = []; setFabSel(null); el.innerHTML = '<p class="muted" style="margin:0">Load a board to check it against the manufacturer\'s limits.</p>'; return; }
+  const P = FAB[state.fab] || FAB.jlc, f = fabStats(), I = f.items, n = Math.max(1, f.layers);
   const rows = [];
   // status: ok / warn (allowed but below the recommended value or extra cost) / bad / na (not measured or no published limit)
   const minCheck = (v, min, rec) => v == null || min == null ? 'na' : v < min - 1e-6 ? 'bad' : rec != null && v < rec - 1e-6 ? 'warn' : 'ok';
   const lim = (min, rec, pre = '≥ ') => min == null ? 'no published limit' : pre + fmtL(min) + (rec != null && rec > min ? ` (${fmtL(rec)} recommended)` : '');
-  const add = (st, label, val, limit) => rows.push([st, label, val, limit]);
+  // places: the items breaking the limit (worst first), or else the single worst one so the row can still show where it is
+  const placesMin = (items, min, rec) => {
+    if (!items?.length) return [];
+    const th = rec ?? min, sorted = items.slice().sort((a, b) => a.v - b.v);
+    if (th == null) return sorted.slice(0, 1);
+    const fail = sorted.filter(q => q.v < th - 1e-6);
+    return fail.length ? fail : sorted.slice(0, 1);
+  };
+  const add = (st, label, val, limit, key, places = []) => rows.push({ st, label, val, limit, key, places });
   const [bmax0, bmax1] = P.board.max(n), big = Math.max(f.W, f.H), small = Math.min(f.W, f.H);
-  add(small < P.board.min ? 'bad' : big > bmax0 || small > bmax1 ? 'bad' : 'ok', 'Board size', `${fmtL(f.W, false)} × ${fmtL(f.H)}`, `${fmtL(P.board.min, false)} – ${fmtL(bmax0, false)} × ${fmtL(bmax1)}`);
-  add('na', 'Copper layers', String(f.layers), 'limits below use this layer count');
-  add(minCheck(f.minTrace, P.trace(n)), 'Narrowest track', f.minTrace != null ? fmtL(f.minTrace) : '—', lim(P.trace(n)));
+  add(small < P.board.min ? 'bad' : big > bmax0 || small > bmax1 ? 'bad' : 'ok', 'Board size', `${fmtL(f.W, false)} × ${fmtL(f.H)}`, `${fmtL(P.board.min, false)} – ${fmtL(bmax0, false)} × ${fmtL(bmax1)}`, 'size');
+  add('na', 'Copper layers', String(f.layers), 'limits below use this layer count', 'layers');
+  add(minCheck(f.minTrace, P.trace(n)), 'Narrowest track', f.minTrace != null ? fmtL(f.minTrace) : '—', lim(P.trace(n)), 'trace', placesMin(I.trace, P.trace(n)));
   if (f.nHoles) {
-    add(minCheck(f.minPTH, P.drill.min, P.drill.rec), 'Smallest plated hole', f.minPTH != null ? fmtL(f.minPTH) : '—', lim(P.drill.min, P.drill.rec));
-    if (f.minNPTH != null) add(minCheck(f.minNPTH, P.npth), 'Smallest non-plated hole', fmtL(f.minNPTH), lim(P.npth));
-    add(f.maxDrill == null ? 'na' : f.maxDrill > P.drill.max + 1e-6 ? 'bad' : 'ok', 'Largest hole', f.maxDrill != null ? fmtL(f.maxDrill) : '—', '≤ ' + fmtL(P.drill.max));
-    if (f.viaRing != null) add(minCheck(f.viaRing, P.viaRing.min, P.viaRing.rec), 'Via annular ring', fmtL(f.viaRing), lim(P.viaRing.min, P.viaRing.rec));
-    if (f.padRing != null) { const r = P.padRing(n); add(minCheck(f.padRing, r.min, r.rec), 'Pad annular ring (PTH)', fmtL(f.padRing), lim(r.min, r.rec)); }
+    add(minCheck(f.minPTH, P.drill.min, P.drill.rec), 'Smallest plated hole', f.minPTH != null ? fmtL(f.minPTH) : '—', lim(P.drill.min, P.drill.rec), 'pth', placesMin(I.pth, P.drill.min, P.drill.rec));
+    if (f.minNPTH != null) add(minCheck(f.minNPTH, P.npth), 'Smallest non-plated hole', fmtL(f.minNPTH), lim(P.npth), 'npth', placesMin(I.npth, P.npth));
+    const tooBig = I.drill.filter(q => q.v > P.drill.max + 1e-6).sort((a, b) => b.v - a.v);
+    add(f.maxDrill == null ? 'na' : f.maxDrill > P.drill.max + 1e-6 ? 'bad' : 'ok', 'Largest hole', f.maxDrill != null ? fmtL(f.maxDrill) : '—', '≤ ' + fmtL(P.drill.max), 'drill',
+      tooBig.length ? tooBig : I.drill.slice().sort((a, b) => b.v - a.v).slice(0, 1));
+    if (f.viaRing != null) add(minCheck(f.viaRing, P.viaRing.min, P.viaRing.rec), 'Via annular ring', fmtL(f.viaRing), lim(P.viaRing.min, P.viaRing.rec), 'viaRing', placesMin(I.viaRing, P.viaRing.min, P.viaRing.rec));
+    if (f.padRing != null) { const r = P.padRing(n); add(minCheck(f.padRing, r.min, r.rec), 'Pad annular ring (PTH)', fmtL(f.padRing), lim(r.min, r.rec), 'padRing', placesMin(I.padRing, r.min, r.rec)); }
+    if (f.noPad) add('warn', 'Plated hole without pad', f.noPad + ' hole' + (f.noPad > 1 ? 's' : ''), 'no copper pad on the outer layers', 'noPad', I.noPad);
     if (P.holeGap) {
-      if (f.gapVia != null) add(minCheck(f.gapVia, P.holeGap.via), 'Via hole to hole', fmtL(f.gapVia), lim(P.holeGap.via));
-      if (f.gapPad != null) add(minCheck(f.gapPad, P.holeGap.pad), 'Pad hole to hole', fmtL(f.gapPad), lim(P.holeGap.pad));
+      if (f.gapVia != null) add(minCheck(f.gapVia, P.holeGap.via), 'Via hole to hole', fmtL(f.gapVia), lim(P.holeGap.via), 'gapVia', placesMin(I.gapVia, P.holeGap.via));
+      if (f.gapPad != null) add(minCheck(f.gapPad, P.holeGap.pad), 'Pad hole to hole', fmtL(f.gapPad), lim(P.holeGap.pad), 'gapPad', placesMin(I.gapPad, P.holeGap.pad));
     }
-    add(f.holeEdge == null ? 'ok' : minCheck(f.holeEdge, 0.3), 'Hole to board edge', f.holeEdge != null ? fmtL(f.holeEdge) : '> 3 mm', 'rule of thumb ≥ ' + fmtL(0.3));
-    if (f.castell) add('warn', 'Castellated half-holes', f.castell + ' on the board edge', 'order with the castellated-hole option');
-  } else add('na', 'Holes', 'none', 'no drill file loaded');
-  add(f.edge == null ? 'ok' : minCheck(f.edge, P.edge), 'Copper to board edge', f.edge != null ? '≈ ' + fmtL(f.edge) : '> 3 mm', P.edge != null ? lim(P.edge) : 'no published limit');
-  if (f.silk != null) add(minCheck(f.silk, P.silk), 'Thinnest silkscreen line', fmtL(f.silk), lim(P.silk));
+    add(f.holeEdge == null ? 'ok' : minCheck(f.holeEdge, 0.3), 'Hole to board edge', f.holeEdge != null ? fmtL(f.holeEdge) : '> 3 mm', 'rule of thumb ≥ ' + fmtL(0.3), 'holeEdge', placesMin(I.holeEdge, 0.3));
+    if (f.castell) add('warn', 'Castellated half-holes', f.castell + ' on the board edge', 'order with the castellated-hole option', 'castell', I.castell);
+  } else add('na', 'Holes', 'none', 'no drill file loaded', 'holes');
+  add(f.edge == null ? 'ok' : minCheck(f.edge, P.edge), 'Copper to board edge', f.edge != null ? '≈ ' + fmtL(f.edge) : '> 3 mm', P.edge != null ? lim(P.edge) : 'no published limit', 'edge', placesMin(I.edge, P.edge));
+  if (f.silk != null) add(minCheck(f.silk, P.silk), 'Thinnest silkscreen line', fmtL(f.silk), lim(P.silk), 'silk', placesMin(I.silk, P.silk));
+  fabRows = rows;
   const icon = { ok: '✓', warn: '!', bad: '✗', na: '–' };
-  const bad = rows.filter(r => r[0] === 'bad').length, warn = rows.filter(r => r[0] === 'warn').length;
-  el.innerHTML = `<p class="muted" style="margin:0 0 6px">${bad ? `<b style="color:var(--err)">${bad} problem${bad > 1 ? 's' : ''}</b>` : 'No problems found'}${warn ? ` · ${warn} to review` : ''} for ${P.name} standard.</p>`
-    + '<table class="fab">' + rows.map(([st, label, val, limit]) =>
-      `<tr><td><span class="fi ${st}" aria-label="${st}">${icon[st]}</span></td><td>${label}<span class="lim">${limit}</span></td><td class="v">${val}</td></tr>`).join('') + '</table>'
-    + `<p class="fabnote">Measured from the Gerbers; spacing between copper features is not checked.${f.noPad ? ` ${f.noPad} plated hole${f.noPad > 1 ? 's have' : ' has'} no pad on the outer layers.` : ''} Limits from the <a href="${P.url}" target="_blank" rel="noopener">${P.name} capabilities page</a> (Nov 2026) — check it before ordering.</p>`;
+  const bad = rows.filter(r => r.st === 'bad').length, warn = rows.filter(r => r.st === 'warn').length;
+  const where = r => !r.places.length ? '' : (r.st === 'bad' || r.st === 'warn') && r.places.length > 1 ? `<span class="where">${r.places.length} places · show</span>` : '<span class="where">show</span>';
+  el.innerHTML = `<p class="muted" style="margin:0 0 6px">${bad ? `<b style="color:var(--err)">${bad} problem${bad > 1 ? 's' : ''}</b>` : 'No problems found'}${warn ? ` · ${warn} to review` : ''} for ${P.name} standard.${rows.some(r => r.places.length) ? ' Click a row to see it on the board.' : ''}</p>`
+    + '<table class="fab">' + rows.map(r =>
+      `<tr data-key="${r.key}"${r.places.length ? ' class="go" tabindex="0" title="Show on the board"' : ''}${fabSel?.key === r.key ? ' aria-selected="true"' : ''}><td><span class="fi ${r.st}" aria-label="${r.st}">${icon[r.st]}</span></td><td>${r.label}<span class="lim">${r.limit}</span></td><td class="v">${r.val}${where(r)}</td></tr>`).join('') + '</table>'
+    + `<p class="fabnote">Measured from the Gerbers; spacing between copper features is not checked. Limits from the <a href="${P.url}" target="_blank" rel="noopener">${P.name} capabilities page</a> (Nov 2026) — check it before ordering.</p>`;
+  // keep the row being shown, with its places for the new profile / board
+  if (fabSel) { const r = rows.find(q => q.key === fabSel.key); if (r && r.places.length) setFabSel({ key: r.key, i: Math.min(fabSel.i, r.places.length - 1) }, false); else setFabSel(null); }
 }
 document.getElementById('fabProfile').onchange = e => { state.fab = e.target.value; saveSettings(); renderFab(); };
+{
+  const fabEl = document.getElementById('fab');
+  const pick = tr => { if (!tr?.classList.contains('go')) return; const k = tr.dataset.key; setFabSel(fabSel?.key === k ? null : { key: k, i: 0 }, true); };
+  fabEl.addEventListener('click', e => { if (!e.target.closest('a')) pick(e.target.closest('tr')); });
+  fabEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(e.target.closest('tr')); } });
+}
+
+/* ---------- Fab check on the board: rings on every place a row points at, the current one larger ---------- */
+const FAB_COL = { bad: '#ff3b47', warn: '#ffb020', ok: '#3b82f6', na: '#3b82f6' };
+let ringTex = null;
+function ringTexture() {
+  if (ringTex) return ringTex;
+  const c = makeCanvas(64, 64), x = c.getContext('2d');
+  x.lineWidth = 7; x.strokeStyle = 'rgba(0,0,0,.55)'; x.beginPath(); x.arc(32, 32, 24, 0, TAU); x.stroke();
+  x.lineWidth = 4; x.strokeStyle = '#fff'; x.beginPath(); x.arc(32, 32, 24, 0, TAU); x.stroke();
+  return ringTex = new THREE.CanvasTexture(c);
+}
+function fabRow() { return fabSel && fabRows.find(r => r.key === fabSel.key); }
+function setFabSel(sel, focus) {
+  fabSel = sel;
+  document.querySelectorAll('#fab tr[data-key]').forEach(tr => tr.setAttribute('aria-selected', !!sel && tr.dataset.key === sel.key));
+  drawFabMarkers(); renderFabChip();
+  if (focus && sel) focusFabPlace();
+}
+function stepFab(d) { const r = fabRow(); if (!r) return; fabSel.i = (fabSel.i + d + r.places.length) % r.places.length; drawFabMarkers(); renderFabChip(); focusFabPlace(); }
+function removeFabMarkers(g) {
+  for (const o of g?.userData.fabMk || []) { g.remove(o); o.geometry.dispose(); o.material.dispose(); }
+  if (g) g.userData.fabMk = [];
+}
+function drawFabMarkers() {
+  const g = board(); if (!g) return;
+  removeFabMarkers(g);
+  const r = fabRow(); if (!r || !built) return;
+  const { cx, cy } = built, surf = g.userData.surf;
+  const z = q => q.side === 'bottom' ? surf.bot - 0.03 : surf.top + 0.03;
+  const col = FAB_COL[r.st] || FAB_COL.ok, cur = r.places[fabSel.i];
+  const mk = (pts, size, color) => {
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    const m = new THREE.Points(geo, new THREE.PointsMaterial({ map: ringTexture(), color, size, sizeAttenuation: false, transparent: true, depthTest: false, depthWrite: false, toneMapped: false }));
+    m.renderOrder = 1e9; m.frustumCulled = false; m.userData.helper = true; g.add(m); g.userData.fabMk.push(m);
+  };
+  const all = []; for (const q of r.places.slice(0, 5000)) if (q !== cur) all.push(q.x - cx, q.y - cy, z(q));
+  if (all.length) mk(all, 18, col);
+  if (cur) {
+    mk([cur.x - cx, cur.y - cy, z(cur)], 34, col);
+    if (cur.bx != null) {   // a gap between two holes: draw the gap
+      const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(cur.ax - cx, cur.ay - cy, z(cur)), new THREE.Vector3(cur.bx - cx, cur.by - cy, z(cur))]);
+      const ln = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: col, depthTest: false, transparent: true, toneMapped: false }));
+      ln.renderOrder = 1e9; ln.userData.helper = true; g.add(ln); g.userData.fabMk.push(ln);
+    }
+  }
+}
+function renderFabChip() {
+  const chip = document.getElementById('fabChip'), r = fabRow();
+  if (!r) { chip.hidden = true; return; }
+  const q = r.places[fabSel.i], n = r.places.length;
+  document.getElementById('fabChipDot').style.background = FAB_COL[r.st] || FAB_COL.ok;
+  document.getElementById('fabChipTxt').innerHTML = `<b>${r.label}</b> · ${q.bx != null ? 'gap ' : ''}${fmtL(q.v)} at ${fmtL(q.x, false)}, ${fmtL(q.y)}${q.side !== 'both' ? ' · ' + q.side : ''}`
+    + (n > 1 ? ` · <span class="muted">${fabSel.i + 1} of ${n}</span>` : '');
+  document.getElementById('fabPrev').hidden = document.getElementById('fabNext').hidden = n < 2;
+  chip.hidden = false;
+}
+// Move the camera to the current place, keeping the viewing angle; turn to the side the feature is on if needed
+function focusFabPlace() {
+  const r = fabRow(), g = board(); if (!r || !g || !built) return;
+  const q = r.places[fabSel.i]; if (!q) return;
+  g.updateMatrixWorld();
+  const inv = new THREE.Matrix4().copy(g.matrixWorld).invert(), camL = cam.position.clone().applyMatrix4(inv);
+  const want = q.side === 'bottom' ? -1 : q.side === 'top' ? 1 : Math.sign(camL.z) || 1;
+  if (state.is2D) {
+    const s2 = want < 0 ? 'bottom' : 'top';
+    if (s2 !== side2D) { side2D = s2; setView(s2, true); markView(s2); }
+  }
+  const surf = g.userData.surf, P = g.localToWorld(new THREE.Vector3(q.x - built.cx, q.y - built.cy, want < 0 ? surf.bot : surf.top));
+  let dir = cam.position.clone().sub(controls.target);
+  if (dir.lengthSq() < 1e-9) dir.set(0, 1, 0);
+  dir.normalize();
+  if (!state.is2D) {   // seen from the wrong side: mirror the view direction through the board
+    const dl = dir.clone().transformDirection(inv);
+    if (Math.sign(dl.z) !== want) { dl.z = -dl.z; dir = dl.transformDirection(g.matrixWorld).normalize(); }
+  }
+  const span = Math.min(60, Math.max(2.5, (q.s || 1) * 2));
+  let dist;
+  if (cam.isOrthographicCamera) { cam.zoom = 2 * orthoHalf / span; cam.updateProjectionMatrix(); dist = cam.position.distanceTo(controls.target); }
+  else dist = span / (2 * Math.tan(cam.fov * Math.PI / 360)) / Math.min(1, cam.aspect);
+  if (!state.is2D) markView(null);
+  tween = { t0: performance.now(), p0: cam.position.clone(), p1: P.clone().addScaledVector(dir, dist), c0: controls.target.clone(), c1: P, u0: cam.up.clone(), u1: cam.up.clone() };
+}
+document.getElementById('fabPrev').onclick = () => stepFab(-1);
+document.getElementById('fabNext').onclick = () => stepFab(1);
+document.getElementById('fabChipX').onclick = () => setFabSel(null);
 
 /* =====================================================================
    Keyboard help
@@ -4192,8 +4527,10 @@ addEventListener('keydown', e => {
   else if (k === 'f' && !state.is2D) view('flip');
   else if (k === 'x') document.getElementById('xrayBtn').click();
   else if (k === '?' || (k === '/' && e.shiftKey)) toggleHelp();
+  else if ((k === 'n' || k === 'p') && fabSel) stepFab(k === 'n' ? 1 : -1);
   else if (k === 'Escape') {
     if (!helpEl.hidden) { toggleHelp(false); return; }
+    if (fabSel && !state.meas.pts.length) { setFabSel(null); return; }
     state.meas.pts = []; state.meas.hover = null; updateMeasureHelpers();
     if (state.net) setNet(null);
   }
