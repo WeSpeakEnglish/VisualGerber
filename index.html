@@ -1801,31 +1801,42 @@ function texture(canvas, srgb) {
 // Surface shader tweaks. The copper relief is a bump map: seen from afar, many texels fall in one screen pixel
 // and the relief turns into stair-steps and sparkles on thin tracks, so it fades out as the texture is minified.
 // The close-up patch also cuts itself away outside its own area.
-// The relief is sampled with an even (isotropic) filter, a little wider than one screen pixel, so the bevel along
-// pad and track edges stays a smooth ramp at every zoom and angle. A one-pixel-wide relief line steps every few
-// pixels on a slanted edge, which shows as rows of small notches across parallel pads.
-const BUMP_FADE = THREE.ShaderChunk.bumpmap_pars_fragment.replace(/vec2 dHdxy_fwd\(\) \{[\s\S]*?return vec2\( dBx, dBy \);\s*\}/, `vec2 dHdxy_fwd() {
-		vec2 dSTdx = dFdx( vBumpMapUv );
-		vec2 dSTdy = dFdy( vBumpMapUv );
+// Copper relief. three.js builds bump lighting from screen-space derivatives (dFdx/dFdy), which many GPUs evaluate
+// once per 2x2 pixel block; along a pad or track edge each block then gets its own tilt and the edge shows small
+// ticks. Here the slope is read straight from the height map along the board's X and Y axes (the texture runs
+// along them), sampled with an even filter about two screen pixels wide, so the bevel is a smooth ramp on any GPU.
+// It also fades out where the texture is shrunk on screen (seen from afar), where relief would only shimmer.
+const PCB_BUMP_PARS = `#ifdef USE_BUMPMAP
+	uniform sampler2D bumpMap;
+	uniform float bumpScale;
+	varying vec3 vPcbTx;
+	varying vec3 vPcbTy;
+	vec3 pcbBump( vec3 n ) {
 		vec2 bTs = vec2( textureSize( bumpMap, 0 ) );
-		float bFoot = max( length( dSTdx * bTs ), length( dSTdy * bTs ) );
+		float bFoot = max( length( dFdx( vBumpMapUv ) * bTs ), length( dFdy( vBumpMapUv ) * bTs ) );
 		float bK = clamp( ( 2.5 - bFoot ) / 1.5, 0.0, 1.0 ) * bumpScale;
-		// filter over about two screen pixels and take central differences, so the bevel at a pad edge is a
-		// smooth ramp a few pixels wide instead of a one-pixel line that breaks into steps (notches) on slanted edges
-		float bG = 2.0 * max( length( dSTdx ), length( dSTdy ) );
-		vec2 gx = vec2( bG, 0.0 ), gy = vec2( 0.0, bG );
-		float dBx = 0.5 * bK * ( textureGrad( bumpMap, vBumpMapUv + dSTdx, gx, gy ).x - textureGrad( bumpMap, vBumpMapUv - dSTdx, gx, gy ).x );
-		float dBy = 0.5 * bK * ( textureGrad( bumpMap, vBumpMapUv + dSTdy, gx, gy ).x - textureGrad( bumpMap, vBumpMapUv - dSTdy, gx, gy ).x );
-		return vec2( dBx, dBy );
-	}`);
-if (BUMP_FADE === THREE.ShaderChunk.bumpmap_pars_fragment) console.warn('Relief shader patch did not apply');
+		if ( bK <= 0.0 ) return n;
+		float f = max( bFoot, 1.0 );                       // offset: one screen pixel, at least one texel
+		vec2 eu = vec2( f / bTs.x, 0.0 ), ev = vec2( 0.0, f / bTs.y );
+		float lod = log2( max( 2.0 * bFoot, 1.0 ) );       // filter width about two screen pixels
+		float hx = textureLod( bumpMap, vBumpMapUv + eu, lod ).x - textureLod( bumpMap, vBumpMapUv - eu, lod ).x;
+		float hy = textureLod( bumpMap, vBumpMapUv + ev, lod ).x - textureLod( bumpMap, vBumpMapUv - ev, lod ).x;
+		vec3 g = 0.5 * bK * ( hx * normalize( vPcbTx ) + hy * normalize( vPcbTy ) );
+		return normalize( n - ( g - dot( g, n ) * n ) );   // tilt away from the copper, keeping the face side
+	}
+#endif`;
 function patchSurface(mat, patchArea) {
   mat.onBeforeCompile = sh => {
-    sh.fragmentShader = sh.fragmentShader.replace('#include <bumpmap_pars_fragment>', BUMP_FADE);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\n#ifdef USE_BUMPMAP\nvarying vec3 vPcbTx;\nvarying vec3 vPcbTy;\n#endif')
+      .replace('#include <defaultnormal_vertex>', '#include <defaultnormal_vertex>\n#ifdef USE_BUMPMAP\nvPcbTx = mat3( modelViewMatrix ) * vec3( 1.0, 0.0, 0.0 );\nvPcbTy = mat3( modelViewMatrix ) * vec3( 0.0, 1.0, 0.0 );\n#endif');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <bumpmap_pars_fragment>', PCB_BUMP_PARS)
+      .replace('#include <normal_fragment_maps>', '#ifdef USE_BUMPMAP\nnormal = pcbBump( normal );\n#else\n#include <normal_fragment_maps>\n#endif');
     if (patchArea) sh.fragmentShader = sh.fragmentShader.replace('#include <clipping_planes_fragment>',
       '#include <clipping_planes_fragment>\n if (vMapUv.x < 0.0 || vMapUv.x > 1.0 || vMapUv.y < 0.0 || vMapUv.y > 1.0) discard;');
   };
-  mat.customProgramCacheKey = () => patchArea ? 'pcb-surface-patch' : 'pcb-surface';
+  mat.customProgramCacheKey = () => patchArea ? 'pcb-surface-patch-2' : 'pcb-surface-2';
   return mat;
 }
 
