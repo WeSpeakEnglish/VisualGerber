@@ -271,6 +271,8 @@ kbd{display:inline-block;min-width:18px;text-align:center;padding:1px 5px;border
           <input id="thickCustom" type="number" min="0.1" max="10" step="0.01" value="1.6" aria-label="Custom thickness in mm" hidden>
           <select id="thick"><option value="0.4">0.4 mm</option><option value="0.6">0.6 mm</option><option value="0.8">0.8 mm</option><option value="1.0">1.0 mm</option><option value="1.2">1.2 mm</option><option value="1.6" selected>1.6 mm</option><option value="2.0">2.0 mm</option><option value="2.4">2.4 mm</option><option value="3.2">3.2 mm</option><option value="custom">Custom…</option></select>
         </div></div>
+      <div class="row"><label for="minView" title="How far you can zoom in: the smallest piece of board that can fill the height of the view">Closest zoom</label>
+        <select id="minView"><option value="1">1 mm view</option><option value="2">2 mm view</option><option value="4">4 mm view</option><option value="8">8 mm view</option><option value="16">16 mm view</option></select></div>
       <div class="field" role="group" aria-labelledby="bgLbl">
         <div class="field-head"><span id="bgLbl">Background</span><span class="field-val" id="bgName"></span></div>
         <div class="swatches" id="bgSw"><label class="sw sw-custom" id="bgCustomSw" title="Custom color"><input type="color" id="bgCustom" aria-label="Custom background color"></label></div></div>
@@ -1281,7 +1283,7 @@ const state = {
   layers: {}, boardOpacity: 1, style3D: 'real', style2D: 'layers', colors: {}, rcolors: {}, explode: 0, section: { axis: 'off', pos: 0.5 },
   board: null, flipped: false, is2D: true, theme: 'auto', bg: 'theme',
   meas: { on: false, pts: [], hover: null },
-  units: 'mm', fab: 'jlc', net: null,
+  units: 'mm', fab: 'jlc', net: null, minView: 4,
 };
 const L = k => state.layers[k] || (state.layers[k] = DEF_LAYER(k));
 const MASKS = [['#1d5a2c', 'Green'], ['#8f1f1f', 'Red'], ['#1d3f8f', 'Blue'], ['#151515', 'Black'], ['#efefef', 'White'], ['#4b2a73', 'Purple'], ['#d7b81c', 'Yellow']];
@@ -1309,7 +1311,7 @@ const STORE = 'gerber3d.settings.v2';
 function loadSettings() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE) || 'null'); if (!s) return;
-    for (const k of ['mask', 'finish', 'silk', 'thick', 'boardOpacity', 'style3D', 'style2D', 'theme', 'bg', 'is2D', 'units', 'fab']) if (s[k] != null) state[k] = s[k];
+    for (const k of ['mask', 'finish', 'silk', 'thick', 'boardOpacity', 'style3D', 'style2D', 'theme', 'bg', 'is2D', 'units', 'fab', 'minView']) if (s[k] != null) state[k] = s[k];
     if (s.style && !s.style3D) state.style3D = s.style;
     if (s.colors && typeof s.colors === 'object') state.colors = s.colors;
     if (s.rcolors && typeof s.rcolors === 'object') state.rcolors = s.rcolors;
@@ -1319,7 +1321,7 @@ function loadSettings() {
 function saveSettings() {
   try {
     localStorage.setItem(STORE, JSON.stringify({ mask: state.mask, finish: state.finish, silk: state.silk, thick: state.thick,
-      boardOpacity: state.boardOpacity, style3D: state.style3D, style2D: state.style2D, colors: state.colors, rcolors: state.rcolors, is2D: state.is2D, units: state.units, fab: state.fab, theme: state.theme, bg: state.bg, layers: state.layers }));
+      boardOpacity: state.boardOpacity, style3D: state.style3D, style2D: state.style2D, colors: state.colors, rcolors: state.rcolors, is2D: state.is2D, units: state.units, fab: state.fab, minView: state.minView, theme: state.theme, bg: state.bg, layers: state.layers }));
   } catch { /* storage unavailable */ }
 }
 loadSettings();
@@ -1344,6 +1346,16 @@ const ortho = new THREE.OrthographicCamera(-20, 20, 20, -20, 0.1, 20000);
 let cam = persp, orthoHalf = 20;
 const controls = new OrbitControls(cam, renderer.domElement);
 controls.enableDamping = true; controls.dampingFactor = 0.09; controls.screenSpacePanning = true; controls.zoomToCursor = true;
+// Closest zoom: about state.minView mm of board across the height of the view (3D: camera distance; 2D: orthographic
+// zoom). Set in Appearance → Closest zoom.
+const minViewMm = () => Math.min(50, Math.max(0.5, +state.minView || 4));
+function applyMinView() {
+  controls.minDistance = minViewMm() / (2 * Math.tan(persp.fov * Math.PI / 360));
+  controls.maxZoom = 2 * orthoHalf / minViewMm();
+  // already closer than the new limit: step back to it, keeping the view direction
+  if (cam.isOrthographicCamera) { if (cam.zoom > controls.maxZoom) { cam.zoom = controls.maxZoom; cam.updateProjectionMatrix(); } }
+  else { const d = cam.position.distanceTo(controls.target); if (d < controls.minDistance) cam.position.sub(controls.target).setLength(controls.minDistance).add(controls.target); }
+}
 // Lights travel with the camera so every side of the board is lit the same way
 function lightRig(c) {
   scene.add(c);
@@ -1384,8 +1396,10 @@ function animate(t) {
     cam.up.lerpVectors(tween.u0, tween.u1, e).normalize();
     if (k >= 1) tween = null;
   }
+  controls.maxZoom = 2 * orthoHalf / minViewMm();
   controls.update();
   const g = board();
+  if (g && !tween) keepTargetOnSurface(g);
   if (g) {
     // Draw layers back to front relative to the camera so transparency stacks correctly
     g.updateMatrixWorld(); tmpV.copy(cam.position); g.worldToLocal(tmpV);
@@ -1393,9 +1407,26 @@ function animate(t) {
     for (const o of g.children) if (!o.userData.helper) o.renderOrder = s * (o.position.z + (o.userData.zoff || 0));
     placeMeasureLabel(g);
     fitClipPlanes(g);
+    fadeDetail(g);
     watchDetail(g, t);
   }
   renderer.render(scene, cam);
+}
+// The point the 3D view orbits and zooms around is kept on the board surface facing the camera, moved along the
+// line of sight (so the picture does not jump). Otherwise it can end up inside or under the board, and zooming in
+// then flies the camera through the copper until the screen is empty; on the surface, zoom stops at the limit.
+const ktInv = new THREE.Matrix4(), ktC = new THREE.Vector3(), ktT = new THREE.Vector3();
+function keepTargetOnSurface(g) {
+  if (state.is2D) return;
+  g.updateMatrixWorld(); ktInv.copy(g.matrixWorld).invert();
+  ktC.copy(cam.position).applyMatrix4(ktInv); ktT.copy(controls.target).applyMatrix4(ktInv);
+  const zs = ktC.z >= 0 ? g.userData.surf.top : g.userData.surf.bot, dz = ktT.z - ktC.z;
+  if (Math.abs(dz) < 1e-6 || Math.abs(ktT.z - zs) < 1e-4) return;
+  const k = (zs - ktC.z) / dz;
+  if (k <= 0 || !isFinite(k)) return;                 // surface behind the camera: leave as is
+  ktT.sub(ktC).multiplyScalar(k).add(ktC);
+  if (ktT.distanceTo(ktC) < controls.minDistance) return;
+  controls.target.copy(ktT.applyMatrix4(g.matrixWorld));
 }
 // Depth precision falls with the square of the viewing distance, so fixed near/far planes (0.1 to 5000 mm)
 // let barrels and hole walls only 0.01 mm apart z-fight on larger boards. Keep the planes tight around the board.
@@ -1798,46 +1829,112 @@ function texture(canvas, srgb) {
   return t;
 }
 
-// Surface shader tweaks. The copper relief is a bump map: seen from afar, many texels fall in one screen pixel
-// and the relief turns into stair-steps and sparkles on thin tracks, so it fades out as the texture is minified.
-// The close-up patch also cuts itself away outside its own area.
 // Copper relief. three.js builds bump lighting from screen-space derivatives (dFdx/dFdy), which many GPUs evaluate
 // once per 2x2 pixel block; along a pad or track edge each block then gets its own tilt and the edge shows small
 // ticks. Here the slope is read straight from the height map along the board's X and Y axes (the texture runs
-// along them), sampled with an even filter about two screen pixels wide, so the bevel is a smooth ramp on any GPU.
-// It also fades out where the texture is shrunk on screen (seen from afar), where relief would only shimmer.
+// along them) with an even filter, so the bevel is a smooth ramp on any GPU. The bevel has a fixed width on the
+// board (PCB_BEVEL_MM, never under ~2 screen pixels), so the coarse base surface and the sharp close-up patch show
+// the same edge instead of one chunky and one flat. It fades out where the texture is shrunk on screen (seen from
+// afar), where relief would only shimmer.
+const PCB_BEVEL_MM = 0.06;
+// Colour, roughness and metalness of the board surface are sampled with an even (isotropic) filter too. With the
+// GPU's anisotropic filtering, the slanted run of samples straddles the sharp pad edges unevenly at grazing angles
+// and leaves thin streaks in one direction: bright ones in the metal and roughness, feathered ones in the colour.
+const PCB_TEX_FN = `
+uniform sampler2D pcbPMap;      // sharp close-up colour (or nothing)
+uniform sampler2D pcbPPbr;      // sharp close-up packed height / roughness / metalness
+uniform vec4 pcbPRect;          // where the close-up lies, in board uv: u0, v0, u1, v1
+uniform float pcbPOn;            // 0..1: shown, and how sharp it still is for the current zoom (set from the CPU)
+uniform float pcbPTexPerMm;
+vec4 pcbTex( sampler2D t, vec2 uv ) {
+	vec2 ts = vec2( textureSize( t, 0 ) );
+	float g = 0.85 * max( length( dFdx( uv ) * ts ), length( dFdy( uv ) * ts ) );
+	return textureGrad( t, uv, vec2( g / ts.x, 0.0 ), vec2( 0.0, g / ts.y ) );
+}
+// weight of the close-up at board uv: 1 inside, fading to 0 over the last 7 % towards its border
+float pcbPW( vec2 uv ) {
+	vec2 puv = ( uv - pcbPRect.xy ) / ( pcbPRect.zw - pcbPRect.xy );
+	vec2 q = min( puv, 1.0 - puv );
+	return pcbPOn * smoothstep( 0.0, 1.0, min( q.x, q.y ) / 0.07 );
+}
+vec2 pcbPUv( vec2 uv ) { return ( uv - pcbPRect.xy ) / ( pcbPRect.zw - pcbPRect.xy ); }
+// both are sampled every time: texture derivatives must not sit inside a branch
+// The close-up is drawn at about one texture pixel per screen pixel, so it is read with plain bilinear filtering
+// (no mipmaps, no screen-space derivatives): that looks the same on every GPU, including ones that compute
+// derivatives per 2x2 pixel block (Intel on Direct3D 11), where finer tricks leave ticks along edges.
+vec4 pcbTexP( sampler2D t, sampler2D p, vec2 uv ) { return mix( pcbTex( t, uv ), textureLod( p, pcbPUv( uv ), 0.0 ), pcbPW( uv ) ); }`;
+const PCB_EVEN = (chunk, from, to) => { const c = THREE.ShaderChunk[chunk]; if (!c.includes(from)) console.warn('Surface shader patch did not apply: ' + chunk); return c.replace(from, to); };
+const PCB_MAP = PCB_EVEN('map_fragment', 'texture2D( map, vMapUv )', 'pcbTexP( map, pcbPMap, vMapUv )');
+const PCB_ROUGH = PCB_EVEN('roughnessmap_fragment', 'texture2D( roughnessMap, vRoughnessMapUv )', 'pcbTexP( roughnessMap, pcbPPbr, vRoughnessMapUv )');
+const PCB_METAL = PCB_EVEN('metalnessmap_fragment', 'texture2D( metalnessMap, vMetalnessMapUv )', 'pcbTexP( metalnessMap, pcbPPbr, vMetalnessMapUv )');
 const PCB_BUMP_PARS = `#ifdef USE_BUMPMAP
 	uniform sampler2D bumpMap;
 	uniform float bumpScale;
+	uniform float pcbTexPerMm;
 	varying vec3 vPcbTx;
 	varying vec3 vPcbTy;
-	vec3 pcbBump( vec3 n ) {
-		vec2 bTs = vec2( textureSize( bumpMap, 0 ) );
-		float bFoot = max( length( dFdx( vBumpMapUv ) * bTs ), length( dFdy( vBumpMapUv ) * bTs ) );
+	// slope of the height map t at uv along board X and Y (tpm: texture pixels per mm)
+	vec2 pcbSlope( sampler2D t, vec2 uv, float tpm, vec2 duvx, vec2 duvy ) {
+		vec2 bTs = vec2( textureSize( t, 0 ) );
+		float bFoot = max( length( duvx * bTs ), length( duvy * bTs ) );
 		float bK = clamp( ( 2.5 - bFoot ) / 1.5, 0.0, 1.0 ) * bumpScale;
-		if ( bK <= 0.0 ) return n;
-		float f = max( bFoot, 1.0 );                       // offset: one screen pixel, at least one texel
+		float f = max( max( bFoot, 1.0 ), ${PCB_BEVEL_MM.toFixed(3)} * 0.5 * tpm );   // half the bevel width, in texels
 		vec2 eu = vec2( f / bTs.x, 0.0 ), ev = vec2( 0.0, f / bTs.y );
-		float lod = log2( max( 2.0 * bFoot, 1.0 ) );       // filter width about two screen pixels
-		float hx = textureLod( bumpMap, vBumpMapUv + eu, lod ).x - textureLod( bumpMap, vBumpMapUv - eu, lod ).x;
-		float hy = textureLod( bumpMap, vBumpMapUv + ev, lod ).x - textureLod( bumpMap, vBumpMapUv - ev, lod ).x;
-		vec3 g = 0.5 * bK * ( hx * normalize( vPcbTx ) + hy * normalize( vPcbTy ) );
+		float lod = log2( max( max( 2.0 * bFoot, f ), 1.0 ) );   // filter about as wide as the bevel
+		float hx = textureLod( t, uv + eu, lod ).x - textureLod( t, uv - eu, lod ).x;
+		float hy = textureLod( t, uv + ev, lod ).x - textureLod( t, uv - ev, lod ).x;
+		return 0.5 * bK * vec2( hx, hy );
+	}
+	vec3 pcbBump( vec3 n ) {
+		vec2 dx = dFdx( vBumpMapUv ), dy = dFdy( vBumpMapUv );
+		vec2 sl = pcbSlope( bumpMap, vBumpMapUv, pcbTexPerMm, dx, dy );
+		// close-up: fixed bevel width in its own texels, read at full detail (no derivatives involved)
+		vec2 pTs = vec2( textureSize( pcbPPbr, 0 ) ), puv = pcbPUv( vBumpMapUv );
+		float pf = max( 1.0, ${PCB_BEVEL_MM.toFixed(3)} * 0.5 * pcbPTexPerMm );
+		vec2 peu = vec2( pf / pTs.x, 0.0 ), pev = vec2( 0.0, pf / pTs.y );
+		vec2 sp = 0.5 * bumpScale * vec2( textureLod( pcbPPbr, puv + peu, 0.0 ).x - textureLod( pcbPPbr, puv - peu, 0.0 ).x,
+		                                  textureLod( pcbPPbr, puv + pev, 0.0 ).x - textureLod( pcbPPbr, puv - pev, 0.0 ).x );
+		sl = mix( sl, sp, pcbPW( vBumpMapUv ) );
+		vec3 g = sl.x * normalize( vPcbTx ) + sl.y * normalize( vPcbTy );
 		return normalize( n - ( g - dot( g, n ) * n ) );   // tilt away from the copper, keeping the face side
 	}
 #endif`;
-function patchSurface(mat, patchArea) {
+// texPerMm: texture pixels per board mm (sets the bevel width). The sharp close-up of the part of the board on
+// screen is not a separate sheet: it is a second texture of this same surface, blended in by the shader
+// (setSurfacePatch), so there is nothing to z-fight, float above the board or drift while the view moves.
+function patchSurface(mat, texPerMm = mat.userData.texPerMm || 20) {
+  mat.userData.texPerMm = texPerMm;
+  const U = mat.userData.pcbU = mat.userData.pcbU || { pcbPMap: { value: null }, pcbPPbr: { value: null }, pcbPRect: { value: new THREE.Vector4(0, 0, 1, 1) }, pcbPOn: { value: 0 }, pcbPTexPerMm: { value: 20 } };
   mat.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, U, { pcbTexPerMm: { value: texPerMm } });
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\n#ifdef USE_BUMPMAP\nvarying vec3 vPcbTx;\nvarying vec3 vPcbTy;\n#endif')
       .replace('#include <defaultnormal_vertex>', '#include <defaultnormal_vertex>\n#ifdef USE_BUMPMAP\nvPcbTx = mat3( modelViewMatrix ) * vec3( 1.0, 0.0, 0.0 );\nvPcbTy = mat3( modelViewMatrix ) * vec3( 0.0, 1.0, 0.0 );\n#endif');
     sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\n' + PCB_TEX_FN)
+      .replace('#include <map_fragment>', PCB_MAP)
+      .replace('#include <roughnessmap_fragment>', PCB_ROUGH)
+      .replace('#include <metalnessmap_fragment>', PCB_METAL)
       .replace('#include <bumpmap_pars_fragment>', PCB_BUMP_PARS)
       .replace('#include <normal_fragment_maps>', '#ifdef USE_BUMPMAP\nnormal = pcbBump( normal );\n#else\n#include <normal_fragment_maps>\n#endif');
-    if (patchArea) sh.fragmentShader = sh.fragmentShader.replace('#include <clipping_planes_fragment>',
-      '#include <clipping_planes_fragment>\n if (vMapUv.x < 0.0 || vMapUv.x > 1.0 || vMapUv.y < 0.0 || vMapUv.y > 1.0) discard;');
   };
-  mat.customProgramCacheKey = () => patchArea ? 'pcb-surface-patch-2' : 'pcb-surface-2';
+  mat.customProgramCacheKey = () => 'pcb-surface-5';
   return mat;
+}
+// Show (or clear, with null) the sharp close-up on a board surface material
+function setSurfacePatch(mat, p) {
+  const U = mat?.userData.pcbU; if (!U) return;
+  U.pcbPOn.value = p ? 1 : 0;
+  U.pcbPMap.value = p ? p.map : null; U.pcbPPbr.value = p ? (p.pbr || p.map) : null;
+  if (p) { U.pcbPRect.value.set(...p.rect); U.pcbPTexPerMm.value = p.tpm; }
+}
+// Once zoomed out so far that the close-up has well over one texture pixel per screen pixel, the coarse picture is
+// sharp enough: fade the close-up out (judged at the view centre, every frame)
+function fadeDetail(g) {
+  const dt = g.userData.detail; if (!dt) return;
+  const U = dt.cap.userData.pcbU; if (!U) return;
+  const need = renderer.getPixelRatio() / Math.max(1e-6, mmPerPixel(controls.target));
+  U.pcbPOn.value = Math.min(1, Math.max(0, 2 - dt.d / need));
 }
 
 // Realistic surface: colour texture plus a packed PBR texture (R = bump, G = roughness, B = metalness)
@@ -1895,7 +1992,7 @@ function composeSide(side) {
   return patchSurface(new THREE.MeshPhysicalMaterial({
     map, roughnessMap: pt, metalnessMap: pt, bumpMap: pt, bumpScale: 1.6,
     roughness: 1, metalness: 1, envMapIntensity: 0.75, specularIntensity: 0.4,
-  }), false);
+  }), curView().s * Wp / curView().W);
 }
 
 // Classic Gerber-viewer look: every layer in its own colour, unlit
@@ -1926,7 +2023,7 @@ function composeLayers(side) {
   if (L('outline').on) strokeRoutes(c1, 1.5 / sk);
   c1.setTransform(1, 0, 0, 1, 0, 0);
   paintHoles(c1, LCOL('holes'));
-  return new THREE.MeshBasicMaterial({ map: texture(col, true), toneMapped: false });
+  return patchSurface(new THREE.MeshBasicMaterial({ map: texture(col, true), toneMapped: false }), curView().s * Wp / curView().W);
 }
 
 function sideMaterial(side) {
@@ -2042,7 +2139,7 @@ function buildGeometry() {
 
   if (!exploded) {
     const top = clip(sideMaterial('top')), bot = clip(sideMaterial('bottom'));
-    top.userData.cap = bot.userData.cap = true;
+    top.userData.cap = bot.userData.cap = true; top.userData.side = 'top'; bot.userData.side = 'bottom';
     g.userData.boardMats.push(top, bot);
     addSlab(g, substrateGeo(t, holesOn), [top, edgeMat, bot], t, 0);
     for (let i = 0; i < nIn; i++) {
@@ -2212,7 +2309,7 @@ function updateMaterials() {
   }
   for (const s of g.userData.innerSheets) s.visible = tr;
   const dt = g.userData.detail;
-  if (dt) { if (tr) removeDetail(g); else if (dt.mesh.material.userData.cap) dt.mesh.material.envMapIntensity = state.is2D ? 0.45 : 0.75; }
+  if (dt && tr) removeDetail(g);
   detailDirty = true;
 }
 
@@ -2224,7 +2321,9 @@ let detailDirty = true, detailT = 0, detailSig = '';
 const DETAIL_MAX_PXMM = 300;   // 3.3 µm per pixel
 function removeDetail(g) {
   const dt = g?.userData.detail; if (!dt) return;
-  g.remove(dt.mesh); disposeMat(dt.mesh.material); g.userData.detail = null;
+  setSurfacePatch(dt.cap, null);
+  for (const t of dt.tex) t?.dispose();
+  g.userData.detail = null;
 }
 function watchDetail(g, t) {
   // Rounded, so the last-digit jitter of a resting camera does not count as movement
@@ -2234,12 +2333,7 @@ function watchDetail(g, t) {
   const sig = [0, 1, 2, 4, 5, 6, 8, 9, 10].map(i => R(e, i) + ',' + R(w, i)).join() + '|' + [12, 13, 14].map(i => T(e, i) + ',' + T(w, i)).join()
     + '|' + p[0].toPrecision(4) + ',' + p[5].toPrecision(4) + '|' + renderer.domElement.width + 'x' + renderer.domElement.height;
   if (sig !== detailSig) {
-    detailSig = sig; detailT = t; detailDirty = true;
-    const cur = g.userData.detail;
-    if (cur?.mesh.visible) {
-      const q = detailRegion(g), c = cur.r;
-      if (!q || q.side !== cur.side || c[0] > q.r[0] + 1e-6 || c[1] > q.r[1] + 1e-6 || c[2] < q.r[2] - 1e-6 || c[3] < q.r[3] - 1e-6) cur.mesh.visible = false;
-    }
+    detailSig = sig; detailT = t; detailDirty = true;   // the patch stays up while moving; its soft edge hides the seam
     return;
   }
   if (detailDirty && t - detailT > 200 && !busy.classList.contains('on')) {
@@ -2292,28 +2386,22 @@ function updateDetail(g) {
   const { side, zs, r, d } = q, { b } = built, rw = r[2] - r[0], rh = r[3] - r[1];
   // The current close-up still covers this view sharply enough: keep it
   const cur = g.userData.detail;
-  if (cur && cur.side === side && cur.style === curStyle() && cur.r[0] <= r[0] + 1e-6 && cur.r[1] <= r[1] + 1e-6 && cur.r[2] >= r[2] - 1e-6 && cur.r[3] >= r[3] - 1e-6 && cur.d >= d * 0.8) { cur.mesh.visible = true; return; }
+  if (cur && cur.side === side && cur.style === curStyle() && cur.r[0] <= r[0] + 1e-6 && cur.r[1] <= r[1] + 1e-6 && cur.r[2] >= r[2] - 1e-6 && cur.r[3] >= r[3] - 1e-6 && cur.d >= d * 0.8) return;
 
+  const cap = g.userData.boardMats.find(m => m.userData.cap && m.userData.side === side);
+  if (!cap?.userData.pcbU) { removeDetail(g); return; }
   const W = Math.max(4, Math.round(rw * d)), H = Math.max(4, Math.round(rh * d));
   detailView = { minX: r[0], maxY: r[3], s: d, W, H, rect: r, raster: {}, inner: [] };
   let mat;
   try { mat = isLayers() ? composeLayers(side) : composeSide(side); } finally { detailView = null; }
   const Wb = b[2] - b[0], Hb = b[3] - b[1];
   const u0 = (r[0] - b[0]) / Wb, u1 = (r[0] + W / d - b[0]) / Wb, v1 = (r[3] - b[1]) / Hb, v0 = (r[3] - H / d - b[1]) / Hb;
-  for (const tx of new Set([mat.map, mat.roughnessMap].filter(Boolean))) {
-    tx.wrapS = tx.wrapT = THREE.ClampToEdgeWrapping;
-    tx.repeat.set(1 / (u1 - u0), 1 / (v1 - v0)); tx.offset.set(-u0 / (u1 - u0), -v0 / (v1 - v0));
-  }
-  // Outside the patch the sheet is cut away in the shader, so the clamped texture leaves no smear or edge line
-  patchSurface(mat, true);
-  Object.assign(mat, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4, side: side === 'top' ? THREE.FrontSide : THREE.BackSide });
-  if (mat.isMeshPhysicalMaterial) { mat.userData.cap = true; mat.envMapIntensity = state.is2D ? 0.45 : 0.75; }
-  clip(mat);
+  const tex = [mat.map, mat.roughnessMap !== mat.map ? mat.roughnessMap : null];
+  for (const t of tex) if (t) Object.assign(t, { wrapS: THREE.ClampToEdgeWrapping, wrapT: THREE.ClampToEdgeWrapping, generateMipmaps: false, minFilter: THREE.LinearFilter, anisotropy: 1 });
+  mat.dispose();                                    // only its textures are used, on the board's own surface
   removeDetail(g);
-  const mesh = new THREE.Mesh(sheetGeo(L('holes').on), mat);
-  mesh.position.z = zs; mesh.userData.helper = true; mesh.renderOrder = 0.5;
-  g.add(mesh);
-  g.userData.detail = { mesh, side, style: curStyle(), r: [r[0], r[3] - H / d, r[0] + W / d, r[3]], d };
+  setSurfacePatch(cap, { map: tex[0], pbr: tex[1], rect: [u0, v0, u1, v1], tpm: d });
+  g.userData.detail = { cap, tex, side, style: curStyle(), r: [r[0], r[3] - H / d, r[0] + W / d, r[3]], d };
 }
 
 function updateClipping() {
@@ -2858,6 +2946,13 @@ function renderFab() {
 }
 document.getElementById('fabProfile').onchange = e => { state.fab = e.target.value; saveSettings(); renderFab(); };
 {
+  const mv = document.getElementById('minView');
+  if (![...mv.options].some(o => +o.value === +state.minView)) mv.add(new Option(state.minView + ' mm view', state.minView));
+  mv.value = String(state.minView);
+  mv.onchange = () => { state.minView = +mv.value; saveSettings(); applyMinView(); };
+  applyMinView();
+}
+{
   const fabEl = document.getElementById('fab');
   const pick = tr => { if (!tr?.classList.contains('go')) return; const k = tr.dataset.key; setFabSel(fabSel?.key === k ? null : { key: k, i: 0 }, true); };
   fabEl.addEventListener('click', e => { if (!e.target.closest('a')) pick(e.target.closest('tr')); });
@@ -2938,7 +3033,7 @@ function focusFabPlace() {
     const dl = dir.clone().transformDirection(inv);
     if (Math.sign(dl.z) !== want) { dl.z = -dl.z; dir = dl.transformDirection(g.matrixWorld).normalize(); }
   }
-  const span = Math.min(60, Math.max(2.5, (q.s || 1) * 2));
+  const span = Math.min(60, Math.max(minViewMm(), (q.s || 1) * 2));
   let dist;
   if (cam.isOrthographicCamera) { cam.zoom = 2 * orthoHalf / span; cam.updateProjectionMatrix(); dist = cam.position.distanceTo(controls.target); }
   else dist = span / (2 * Math.tan(cam.fov * Math.PI / 360)) / Math.min(1, cam.aspect);
