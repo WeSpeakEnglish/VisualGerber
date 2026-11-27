@@ -1,4 +1,6 @@
-# Gerber 3D Viewer
+# Visual Gerber Is A Gerber 3D Viewer
+
+<img width="800" height="411" alt="gerber3d" src="https://github.com/user-attachments/assets/fc502526-2061-4b00-8f48-8becb95ae9f2" />
 
 A single-file, browser-based 2D and 3D viewer for PCB Gerber, Excellon drill, pick-and-place and ODB++ files,
 including old EAGLE RS-274D sets with a `.WHL` aperture file and PADS-style sets whose files have no extension. It can also compare two versions of a board and show what changed,
